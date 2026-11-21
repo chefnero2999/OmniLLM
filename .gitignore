@@ -1,0 +1,20 @@
+# Fetched by scripts/fetch_llama.sh — 33 MB and 1,270 files, never commit it.
+core/src/main/cpp/llama.cpp/
+
+# Build output
+build/
+.gradle/
+*.apk
+*.aab
+*.so
+
+# Local machine paths
+local.properties
+
+# IDE
+.idea/
+*.iml
+.DS_Store
+
+# Models (gigabytes)
+*.gguf

@@ -1,0 +1,2 @@
+-keepclasseswithmembernames,includedescriptorclasses class com.omni.llm.core.LlamaBridge { *; }
+-keep class com.omni.llm.core.LlamaBridge { *; }

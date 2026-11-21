@@ -1,0 +1,310 @@
+{
+  "schema": 1,
+  "updated": "2026-11-17",
+  "note": "Curated GGUF set, now categorised (everyday / coding / reasoning) so the Models tab can group them. Q4_K_M only: anything above Q8_0 is banned on mobile and F16 never ships. Every sha256 is the real Hugging Face LFS object hash, taken from the repo tree API.",
+  "models": [
+    {
+      "id": "qwen2.5-0.5b-instruct-q4km",
+      "name": "Qwen 2.5 0.5B Instruct",
+      "family": "Qwen2.5",
+      "fileName": "Qwen2.5-0.5B-Instruct-Q4_K_M.gguf",
+      "paramCount": 494032768,
+      "quantization": "Q4_K_M",
+      "fileSizeBytes": 397808192,
+      "downloadUrl": "https://huggingface.co/bartowski/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/Qwen2.5-0.5B-Instruct-Q4_K_M.gguf",
+      "sha256": "6eb923e7d26e9cea28811e1a8e852009b21242fb157b26149d3b188f3a8c8653",
+      "minRamMb": 3072,
+      "recommendedContext": 2048,
+      "kvBytesPerToken": 86016,
+      "tier": "ultra-low-end",
+      "license": "Apache-2.0",
+      "description": "Ultra-low-end fallback. Loads and runs on essentially any 3 GB+ arm64 device. Short answers, weak reasoning — but it never crashes the phone.",
+      "category": "everyday",
+      "tags": [
+        "tiny",
+        "fast"
+      ]
+    },
+    {
+      "id": "llama-3.2-1b-instruct-q4km",
+      "name": "Llama 3.2 1B Instruct",
+      "family": "Llama 3.2",
+      "fileName": "Llama-3.2-1B-Instruct-Q4_K_M.gguf",
+      "paramCount": 1235814400,
+      "quantization": "Q4_K_M",
+      "fileSizeBytes": 807694464,
+      "downloadUrl": "https://huggingface.co/bartowski/Llama-3.2-1B-Instruct-GGUF/resolve/main/Llama-3.2-1B-Instruct-Q4_K_M.gguf",
+      "sha256": "6f85a640a97cf2bf5b8e764087b1e83da0fdb51d7c9fab7d0fece9385611df83",
+      "minRamMb": 4096,
+      "recommendedContext": 4096,
+      "kvBytesPerToken": 131072,
+      "tier": "daily-driver",
+      "license": "Llama 3.2 Community License",
+      "description": "The daily driver for 4–6 GB phones. Best instruction-following per megabyte in this list.",
+      "category": "everyday",
+      "tags": [
+        "fast"
+      ]
+    },
+    {
+      "id": "qwen2.5-1.5b-instruct-q4km",
+      "name": "Qwen 2.5 1.5B Instruct",
+      "family": "Qwen2.5",
+      "fileName": "Qwen2.5-1.5B-Instruct-Q4_K_M.gguf",
+      "paramCount": 1543714304,
+      "quantization": "Q4_K_M",
+      "fileSizeBytes": 986048768,
+      "downloadUrl": "https://huggingface.co/bartowski/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/Qwen2.5-1.5B-Instruct-Q4_K_M.gguf",
+      "sha256": "1adf0b11065d8ad2e8123ea110d1ec956dab4ab038eab665614adba04b6c3370",
+      "minRamMb": 6144,
+      "recommendedContext": 4096,
+      "kvBytesPerToken": 172032,
+      "tier": "balanced",
+      "license": "Apache-2.0",
+      "description": "Best quality-per-byte for 6–8 GB devices. Noticeably better at code and multilingual than the 1B.",
+      "category": "everyday",
+      "tags": [
+        "balanced"
+      ]
+    },
+    {
+      "id": "phi-4-mini-instruct-q4km",
+      "name": "Phi-4 Mini Instruct",
+      "family": "Phi-4",
+      "fileName": "Phi-4-mini-instruct-Q4_K_M.gguf",
+      "paramCount": 3830000000,
+      "quantization": "Q4_K_M",
+      "fileSizeBytes": 2491874272,
+      "downloadUrl": "https://huggingface.co/unsloth/Phi-4-mini-instruct-GGUF/resolve/main/Phi-4-mini-instruct-Q4_K_M.gguf",
+      "sha256": "88c00229914083cd112853aab84ed51b87bdf6b9ce42f532d8c85c7c63b1730a",
+      "minRamMb": 8192,
+      "recommendedContext": 4096,
+      "kvBytesPerToken": 393216,
+      "tier": "flagship",
+      "license": "MIT",
+      "description": "Flagship-only. Gated behind a high-RAM warning: on anything under 8 GB this will fight the Low Memory Killer.",
+      "category": "reasoning",
+      "tags": [
+        "reasoning"
+      ]
+    },
+    {
+      "id": "qwen2.5-coder-1.5b-q4km",
+      "name": "Qwen 2.5 Coder 1.5B",
+      "family": "Qwen2.5-Coder",
+      "fileName": "Qwen2.5-Coder-1.5B-Instruct-Q4_K_M.gguf",
+      "paramCount": 1543714304,
+      "quantization": "Q4_K_M",
+      "fileSizeBytes": 986048800,
+      "downloadUrl": "https://huggingface.co/bartowski/Qwen2.5-Coder-1.5B-Instruct-GGUF/resolve/main/Qwen2.5-Coder-1.5B-Instruct-Q4_K_M.gguf",
+      "sha256": "f530705d447660a4336c329981af164b471b60b974b1d808d57e8ec9fe23b239",
+      "minRamMb": 4096,
+      "recommendedContext": 4096,
+      "kvBytesPerToken": 131072,
+      "tier": "daily-driver",
+      "license": "Apache-2.0",
+      "description": "Writes and fixes code surprisingly well for 1.5B. The best small offline coding model on this list.",
+      "category": "coding",
+      "tags": [
+        "coding",
+        "fast"
+      ]
+    },
+    {
+      "id": "deepseek-r1-distill-qwen-1.5b-q4km",
+      "name": "DeepSeek R1 Distill 1.5B",
+      "family": "DeepSeek-R1",
+      "fileName": "DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M.gguf",
+      "paramCount": 1777088000,
+      "quantization": "Q4_K_M",
+      "fileSizeBytes": 1117320800,
+      "downloadUrl": "https://huggingface.co/bartowski/DeepSeek-R1-Distill-Qwen-1.5B-GGUF/resolve/main/DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M.gguf",
+      "sha256": "1741e5b2d062b07acf048bf0d2c514dadf2a48f94e2b4aa0cfe069af3838ee2f",
+      "minRamMb": 4096,
+      "recommendedContext": 4096,
+      "kvBytesPerToken": 131072,
+      "tier": "daily-driver",
+      "license": "Apache-2.0",
+      "description": "Small reasoning model that shows its steps. Slower than the others because it thinks first.",
+      "category": "reasoning",
+      "tags": [
+        "reasoning",
+        "thinking"
+      ]
+    },
+    {
+      "id": "qwen2.5-3b-instruct-q4km",
+      "name": "Qwen 2.5 3B",
+      "family": "Qwen2.5",
+      "fileName": "Qwen2.5-3B-Instruct-Q4_K_M.gguf",
+      "paramCount": 3085938688,
+      "quantization": "Q4_K_M",
+      "fileSizeBytes": 1929903264,
+      "downloadUrl": "https://huggingface.co/bartowski/Qwen2.5-3B-Instruct-GGUF/resolve/main/Qwen2.5-3B-Instruct-Q4_K_M.gguf",
+      "sha256": "9c9f56a391a3abbd5b89d0245bf6106081bcc3173119d4229235dd9d23253f94",
+      "minRamMb": 6144,
+      "recommendedContext": 4096,
+      "kvBytesPerToken": 212992,
+      "tier": "daily-driver",
+      "license": "Apache-2.0",
+      "description": "The sweet spot for 6 GB phones: noticeably smarter than 1.5B, still comfortable in memory.",
+      "category": "everyday",
+      "tags": [
+        "balanced"
+      ]
+    },
+    {
+      "id": "qwen2.5-coder-3b-q4km",
+      "name": "Qwen 2.5 Coder 3B",
+      "family": "Qwen2.5-Coder",
+      "fileName": "Qwen2.5-Coder-3B-Instruct-Q4_K_M.gguf",
+      "paramCount": 3085938688,
+      "quantization": "Q4_K_M",
+      "fileSizeBytes": 1929903360,
+      "downloadUrl": "https://huggingface.co/bartowski/Qwen2.5-Coder-3B-Instruct-GGUF/resolve/main/Qwen2.5-Coder-3B-Instruct-Q4_K_M.gguf",
+      "sha256": "3da3afe6cf5c674ac195803ea0dd6fee7e1c228c2105c1ce8c66890d1d4ab460",
+      "minRamMb": 6144,
+      "recommendedContext": 4096,
+      "kvBytesPerToken": 212992,
+      "tier": "daily-driver",
+      "license": "Apache-2.0",
+      "description": "Offline coding at a useful size. Handles whole functions, not just snippets.",
+      "category": "coding",
+      "tags": [
+        "coding"
+      ]
+    },
+    {
+      "id": "llama-3.2-3b-instruct-q4km",
+      "name": "Llama 3.2 3B",
+      "family": "Llama 3.2",
+      "fileName": "Llama-3.2-3B-Instruct-Q4_K_M.gguf",
+      "paramCount": 3212749824,
+      "quantization": "Q4_K_M",
+      "fileSizeBytes": 2019377696,
+      "downloadUrl": "https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf",
+      "sha256": "6c1a2b41161032677be168d354123594c0e6e67d2b9227c84f296ad037c728ff",
+      "minRamMb": 6144,
+      "recommendedContext": 4096,
+      "kvBytesPerToken": 212992,
+      "tier": "daily-driver",
+      "license": "Llama 3.2 Community License",
+      "description": "Strong all-round conversation with a big 128K-capable architecture. Needs ~6 GB.",
+      "category": "everyday",
+      "tags": [
+        "chat"
+      ]
+    },
+    {
+      "id": "qwen2.5-7b-instruct-q4km",
+      "name": "Qwen 2.5 7B",
+      "family": "Qwen2.5",
+      "fileName": "Qwen2.5-7B-Instruct-1M-Q4_K_M.gguf",
+      "paramCount": 7615616512,
+      "quantization": "Q4_K_M",
+      "fileSizeBytes": 4683074144,
+      "downloadUrl": "https://huggingface.co/bartowski/Qwen2.5-7B-Instruct-1M-GGUF/resolve/main/Qwen2.5-7B-Instruct-1M-Q4_K_M.gguf",
+      "sha256": "0b6593fb7ab1e58e4c9a7a142076d1ca0bcad69d2681cc651fea581d6fc5a86d",
+      "minRamMb": 10240,
+      "recommendedContext": 4096,
+      "kvBytesPerToken": 458752,
+      "tier": "large",
+      "license": "Apache-2.0",
+      "description": "The best quality you can run on a 12 GB+ phone. 1M context variant; slow but genuinely capable.",
+      "category": "everyday",
+      "tags": [
+        "quality",
+        "large",
+        "1m-context"
+      ]
+    },
+    {
+      "id": "llama-3.2-1b-abliterated-q4km",
+      "name": "Llama 3.2 1B Abliterated",
+      "family": "Llama 3.2 Abliterated",
+      "fileName": "Llama-3.2-1B-Instruct-abliterated.Q4_K_M.gguf",
+      "paramCount": 1235814400,
+      "quantization": "Q4_K_M",
+      "fileSizeBytes": 955445792,
+      "downloadUrl": "https://huggingface.co/mradermacher/Llama-3.2-1B-Instruct-abliterated-GGUF/resolve/main/Llama-3.2-1B-Instruct-abliterated.Q4_K_M.gguf",
+      "sha256": "68336c25367576f49b29f01ee9034658b51bbded6a7f215e934d997de96301e0",
+      "minRamMb": 4096,
+      "recommendedContext": 4096,
+      "kvBytesPerToken": 131072,
+      "tier": "daily-driver",
+      "license": "Llama 3.2 Community License",
+      "description": "Refusal direction removed from the weights. Runs on any 4 GB phone. Genuinely unfiltered, because nothing server-side is involved.",
+      "category": "uncensored",
+      "tags": [
+        "uncensored",
+        "unfiltered"
+      ]
+    },
+    {
+      "id": "qwen2.5-1.5b-abliterated-q4km",
+      "name": "Qwen 2.5 1.5B Abliterated",
+      "family": "Qwen2.5 Abliterated",
+      "fileName": "Qwen2.5-1.5B-Instruct-abliterated.Q4_K_M.gguf",
+      "paramCount": 1543714304,
+      "quantization": "Q4_K_M",
+      "fileSizeBytes": 986049088,
+      "downloadUrl": "https://huggingface.co/mradermacher/Qwen2.5-1.5B-Instruct-abliterated-GGUF/resolve/main/Qwen2.5-1.5B-Instruct-abliterated.Q4_K_M.gguf",
+      "sha256": "59aa9f44bde5349dbe292d7024d197db605f422b8baf65f3246a59abbde4e8e9",
+      "minRamMb": 4096,
+      "recommendedContext": 4096,
+      "kvBytesPerToken": 131072,
+      "tier": "daily-driver",
+      "license": "Apache-2.0",
+      "description": "Abliterated Qwen 2.5. Small, quick, no refusals baked in. The best unfiltered model for weak phones.",
+      "category": "uncensored",
+      "tags": [
+        "uncensored",
+        "unfiltered"
+      ]
+    },
+    {
+      "id": "llama-3.2-3b-abliterated-q4km",
+      "name": "Llama 3.2 3B Abliterated",
+      "family": "Llama 3.2 Abliterated",
+      "fileName": "Llama-3.2-3B-Instruct-abliterated.Q4_K_M.gguf",
+      "paramCount": 3212749824,
+      "quantization": "Q4_K_M",
+      "fileSizeBytes": 2241004512,
+      "downloadUrl": "https://huggingface.co/mradermacher/Llama-3.2-3B-Instruct-abliterated-GGUF/resolve/main/Llama-3.2-3B-Instruct-abliterated.Q4_K_M.gguf",
+      "sha256": "3a8ad1732ca90048bc5ecf44dcb3b789469e8a68d389ab79516853bf0d27ad34",
+      "minRamMb": 6144,
+      "recommendedContext": 4096,
+      "kvBytesPerToken": 212992,
+      "tier": "daily-driver",
+      "license": "Llama 3.2 Community License",
+      "description": "The 3B at full quality with refusals removed. Needs ~6 GB.",
+      "category": "uncensored",
+      "tags": [
+        "uncensored",
+        "unfiltered"
+      ]
+    },
+    {
+      "id": "dolphin3-llama3.2-3b-q4km",
+      "name": "Dolphin 3.0 Llama 3.2 3B",
+      "family": "Dolphin 3.0",
+      "fileName": "Dolphin3.0-Llama3.2-3B.Q4_K_M.gguf",
+      "paramCount": 3212749824,
+      "quantization": "Q4_K_M",
+      "fileSizeBytes": 2019382592,
+      "downloadUrl": "https://huggingface.co/mradermacher/Dolphin3.0-Llama3.2-3B-GGUF/resolve/main/Dolphin3.0-Llama3.2-3B.Q4_K_M.gguf",
+      "sha256": "c48c5cf97be2817be6cde382a00480f33e39fdb5b87b40c4eb57dacc44a7759d",
+      "minRamMb": 6144,
+      "recommendedContext": 4096,
+      "kvBytesPerToken": 212992,
+      "tier": "daily-driver",
+      "license": "Llama 3.2 Community License",
+      "description": "Cognitive Computations' Dolphin. Trained to comply rather than lecture; good instruction following.",
+      "category": "uncensored",
+      "tags": [
+        "uncensored",
+        "unfiltered"
+      ]
+    }
+  ]
+}

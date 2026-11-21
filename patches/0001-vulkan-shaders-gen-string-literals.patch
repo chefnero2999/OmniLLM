@@ -1,0 +1,55 @@
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/vulkan-shaders-gen.cpp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/vulkan-shaders-gen.cpp
+@@ -1289,13 +1289,46 @@
+             }
+ 
+             src << "const uint64_t " << name << "_len = " << data.size() << ";\n";
+-            src << "const unsigned char " << name << "_data[" << data.size() << "] = {\n" << std::hex;
+-            auto bytes = reinterpret_cast<const uint8_t*>(data.data());
+-            for (size_t i = 0; i < data.size(); ++i) {
+-                src << "0x" << static_cast<int>(bytes[i]) << ",";
+-                if ((i + 1) % 12 == 0) src << "\n";
++
++            // Emit the SPIR-V as string literals instead of a brace initialiser list.
++            //
++            // The obvious form (one "0xAB," per byte) produces ~13.5 million separate initializer
++            // expressions across ggml-vulkan's generated shader TUs. clang allocates an AST node
++            // for every one of them, which costs ~1.5 GB RSS on mul_mm.comp.cpp (55 MB, 429
++            // shaders) and gets OOM-killed on any machine with less than ~2 GB free. -O0/-O1 do
++            // not help because the cost is parsing, not optimisation.
++            //
++            // A string literal is one token: peak RSS drops to a few hundred MB. Behaviour is
++            // unchanged because:
++            //   aligned(16)     reproduces the alignment of the uint64_t[] initialiser
++            //   "SHADER_BYTES"  puts the data in .rodata like a const array, so the section is
++            //                   identical and the linker/GC behaviour is the same
++            // No extern "C" (it would clash with the C++ linkage of the declaration in the
++            // generated header) and no section() (an initialised const object already lands in
++            // .rodata). The asm label just pins the exact symbol the header expects, and
++            // aligned(16) keeps the array's alignment identical to the old uint64_t initialiser.
++            // +1: C++ requires room for the NUL that terminates a string-literal initialiser.
++            // The trailing byte is never read — consumers index by the *_len constant.
++            src << "extern const unsigned char " << name
++                << "_data[" << (data.size() + 1) << "] __asm__(\"" << name
++                << "_data\") __attribute__((aligned(16), used)) = {\n";
++            {
++                const unsigned char * bytes = reinterpret_cast<const unsigned char*>(data.data());
++                static const char hexd[] = "0123456789abcdef";
++                std::string escapes;
++                escapes.reserve(data.size() * 6 + 16);
++                for (size_t i = 0; i < data.size(); ++i) {
++                    // A '{' or '}' inside a literal would break brace matching for the surrounding
++                    // initialiser, so every byte is written as a fixed \x escape. That also avoids
++                    // the "\x41B" -> 0x41B pitfall of variable-length hex escapes.
++                    escapes += "\\x";
++                    escapes += hexd[bytes[i] >> 4];
++                    escapes += hexd[bytes[i] & 0xF];
++                    if ((i + 1) % 32 == 0) escapes += "\"\n\"";
++                }
++                src << "\"" << escapes << "\"";
+             }
+-            src << std::dec << "\n};\n\n";
++            src << "\n};\n\n";
+         }
+     }
+ 

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">OmniLLM</string>
+    <string name="notification_channel_name">Local inference</string>
+    <string name="notification_channel_description">Keeps the local model running during long generations.</string>
+    <string name="notification_title">OmniLLM is running locally</string>
+</resources>

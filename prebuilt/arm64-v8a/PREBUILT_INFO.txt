@@ -1,0 +1,6 @@
+libomnillm.so — prebuilt for arm64-v8a (AArch64), android-28, C++ static runtime
+Built from this project's core/src/main/cpp at llama.cpp 918076a6354c647304c33ca12ee71f80de1c91ae
+NDK r27b, Release, BUILD_SHARED_LIBS=OFF, GGML_STATIC=ON, Vulkan OFF, KleidiAI OFF
+Stripped size: 5.3 MB. Depends only on libandroid/liblog/libm/libdl/libc.
+Exports JNI_OnLoad + 15 Java_com_omni_llm_core_LlamaBridge_* symbols.
+Use with: ./gradlew assembleDebug -Pomni.usePrebuilt=true   (no C++ compile, no NDK needed)

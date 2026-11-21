@@ -1,0 +1,44 @@
+libomnillm.so — prebuilt native inference core  [VULKAN / GPU BUILD]
+====================================================================
+Built from:  core/src/main/cpp/{omni_engine,jni_bridge}.cpp + llama.cpp @ 918076a6
+ABI:         arm64-v8a (ELF64 AArch64)
+Platform:    Android 28 (minSdk), NDK r27b
+Variant:     OMNI_VULKAN=ON  (CPU + Vulkan GPU backend)
+Size:        26,004,224 bytes stripped  (~12.8 MB of that is SPIR-V shader blobs)
+JNI exports: 19, all resolved against LlamaBridge.kt (verified both directions)
+NEEDED libs: libvulkan libandroid liblog libm libdl libc  (system only)
+
+Includes, relative to the previous CPU-only build:
+  - Vulkan GPU backend: 429 SPIR-V shaders embedded, ggml_vk_* kernels, GPU offload available
+  - speculative decoding: draft model loader, batched verification, KV rollback
+  - nativePeekModel / nativeSpeculativeVerdict: header-only GGUF inspection
+  - nativeDraftLoaded, draftProposed/draftAccepted in nativeLastStats
+  - nativeLoad gained (draftModelPath, draftGpuLayers, draftTokens)
+
+RUNTIME NOTE — read this before enabling GPU layers:
+  A .so with Vulkan compiled in does NOT mean the phone can use it. ggml enumerates devices at
+  runtime; on a device with a broken/absent Vulkan driver (common on older MediaTek and some
+  vendor ROMs) hasGpuBackend() returns false and the app forces gpuLayers = 0 by itself.
+  Set GPU layers to 0 first, confirm the app runs, then raise in steps of 5. A bad driver is a
+  SIGSEGV, not an exception: the crash-loop breaker drops back to CPU on the next launch.
+
+BUILD NOTE — this build needed a patch:
+  patches/0001-vulkan-shaders-gen-string-literals.patch rewrites ggml's shader generator to emit
+  SPIR-V as string literals. Upstream's per-byte initialiser list made mul_mm.comp.cpp (55 MB,
+  429 shaders) need 1.5 GB RSS to compile and it was OOM-killed on a 2 GB machine; patched it
+  peaks at 774 MB and emits byte-identical data. scripts/fetch_llama.sh applies it automatically.
+
+Rebuild (Vulkan):
+  bash scripts/fetch_llama.sh           # applies the shader-gen patch
+  bash scripts/fetch_vulkan_headers.sh  # Vulkan-Headers + SPIRV-Headers into third_party/
+  cmake -B build -S core/src/main/cpp -G Ninja \
+    -DCMAKE_TOOLCHAIN_FILE=$NDK/build/cmake/android.toolchain.cmake \
+    -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-28 -DANDROID_STL=c++_static \
+    -DCMAKE_BUILD_TYPE=Release -DOMNI_VULKAN=ON -DOMNI_KLEIDIAI=OFF \
+    -DBUILD_SHARED_LIBS=OFF -DGGML_STATIC=ON \
+    -DOMNI_VULKAN_HEADERS_DIR=$PWD/third_party/vulkan-headers/include \
+    -DOMNI_SPIRV_HEADERS_DIR=$PWD/third_party/spirv-headers/include \
+    -DSPIRV-Headers_DIR=$PWD/third_party/spirv-cfg \
+    -DVulkan_GLSLC_EXECUTABLE=$NDK/shader-tools/linux-x86_64/glslc
+  cmake --build build -j1
+  $NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip --strip-unneeded build/libomnillm.so
