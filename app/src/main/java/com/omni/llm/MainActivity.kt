@@ -67,11 +67,10 @@ class MainActivity : ComponentActivity() {
         ensureNotificationPermission()
         val container = (application as OmniApp).container
         setContent {
-            OmniTheme {
-                val settings by container.settings.settings.collectAsState(
-                    initial = com.omni.llm.data.OmniSettings()
-                )
-
+            val settings by container.settings.settings.collectAsState(
+                initial = com.omni.llm.data.OmniSettings()
+            )
+            OmniTheme(themeMode = settings.themeMode) {
                 val modelsVm: ModelsViewModel = viewModel()
                 val chatVm: ChatViewModel = viewModel()
                 val settingsVm: SettingsViewModel = viewModel()
@@ -195,6 +194,7 @@ private fun OmniShell(
                             java.io.File(ctx.filesDir, "projects/${agentState.filesSlug}"),
                         )
                     },
+                    onDeleteAll = agentVm::deleteAllProjects,
                 )
                 1 -> ChatScreen(
                     state = chatState,
@@ -216,6 +216,9 @@ private fun OmniShell(
                     onRetry = chatVm::retry,
                     onStopGeneration = chatVm::stopGeneration,
                     onRegenerate = chatVm::regenerateLast,
+                    onOpenSearch = chatVm::openSearch,
+                    onCloseSearch = chatVm::closeSearch,
+                    onUpdateSearch = chatVm::updateSearch,
                 )
                 2 -> ModelsScreen(
                     state = modelsState,
@@ -249,6 +252,7 @@ private fun OmniShell(
                     onCloudEnabled = settingsVm::setCloudEnabled,
                     onAutoSwitchModels = settingsVm::setAutoSwitchModels,
                     onUnrestrictedMode = settingsVm::setUnrestrictedMode,
+                    onThemeMode = settingsVm::setThemeMode,
                     onApplyDefaults = settingsVm::applyDeviceDefaults,
                     onPanic = settingsVm::panic,
                     onClearCrashLog = settingsVm::clearCrashLog,

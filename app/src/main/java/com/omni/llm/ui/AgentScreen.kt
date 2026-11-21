@@ -107,6 +107,7 @@ fun AgentScreen(
     onDismissDelete: () -> Unit,
     onConfirmDelete: (String) -> Unit,
     onExport: () -> Unit,
+    onDeleteAll: () -> Unit = {},
 ) {
     // 0 = activity, 1 = preview, 2 = images
     var pane by remember { mutableStateOf(0) }
@@ -354,11 +355,24 @@ fun AgentScreen(
         // ------------------------------------------------------------- projects
         if (state.projects.isNotEmpty()) {
             Spacer(Modifier.height(6.dp))
-            Text(
-                "Projects",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    "Projects",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                TextButton(
+                    onClick = onDeleteAll,
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 6.dp, vertical = 0.dp),
+                    modifier = Modifier.height(24.dp),
+                ) {
+                    Text("Delete all", fontSize = 11.sp, color = OmniPalette.danger)
+                }
+            }
             LazyColumn(Modifier.heightIn(max = 132.dp)) {
                 items(state.projects, key = { it.slug }) { project ->
                     Row(

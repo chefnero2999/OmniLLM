@@ -643,7 +643,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
         val key = activeKey
         _state.value = _state.value.copy(
             messages = emptyList(), confirmingClear = false, busy = false,
-            contextUsed = 0, banner = null,
+            contextUsed = 0, banner = null, filteredMessages = null,
         )
         nextId.set(1)
         // Reset the native KV state too, otherwise the local model keeps answering as if the
@@ -655,4 +655,23 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    // ---- search -----------------------------------------------------------------------------
+
+    fun openSearch() {
+        _state.value = _state.value.copy(searchOpen = true, searchQuery = "", filteredMessages = null)
+    }
+
+    fun closeSearch() {
+        _state.value = _state.value.copy(searchOpen = false, searchQuery = "", filteredMessages = null)
+    }
+
+    fun updateSearch(query: String) {
+        val trimmed = query.trim()
+        val filtered = if (trimmed.isEmpty()) {
+            null
+        } else {
+            _state.value.messages.filter { it.content.contains(trimmed, ignoreCase = true) }
+        }
+        _state.value = _state.value.copy(searchQuery = query, filteredMessages = filtered)
+    }
 }

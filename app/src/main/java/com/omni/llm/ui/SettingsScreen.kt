@@ -76,6 +76,7 @@ fun SettingsScreen(
     onCloudEnabled: (Boolean) -> Unit,
     onAutoSwitchModels: (Boolean) -> Unit,
     onUnrestrictedMode: (Boolean) -> Unit,
+    onThemeMode: (String) -> Unit = {},
     onApplyDefaults: () -> Unit,
     onPanic: () -> Unit,
     onClearCrashLog: () -> Unit,
@@ -129,6 +130,45 @@ fun SettingsScreen(
                                 "is loaded. Unload and load it again in the Models tab to apply them.",
                             style = MaterialTheme.typography.bodyMedium, fontSize = 12.sp,
                         )
+                    }
+                }
+            }
+
+            SectionCard("Appearance") {
+                Text(
+                    "Theme",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontSize = 15.sp,
+                )
+                Text(
+                    "Choose between dark mode, light mode, or match your device system setting.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    val currentMode = state.themeMode
+                    listOf("system" to "System", "dark" to "Dark", "light" to "Light").forEach { (mode, label) ->
+                        val selected = currentMode == mode
+                        if (selected) {
+                            Button(
+                                onClick = { onThemeMode(mode) },
+                                modifier = Modifier.weight(1f),
+                            ) {
+                                Text(label, fontSize = 13.sp)
+                            }
+                        } else {
+                            OutlinedButton(
+                                onClick = { onThemeMode(mode) },
+                                modifier = Modifier.weight(1f),
+                            ) {
+                                Text(label, fontSize = 13.sp)
+                            }
+                        }
                     }
                 }
             }

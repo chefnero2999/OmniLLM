@@ -29,6 +29,10 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Share
+import android.content.Intent
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -92,8 +96,12 @@ fun ChatScreen(
     onRetry: (Long) -> Unit,
     onStopGeneration: () -> Unit,
     onRegenerate: () -> Unit,
+    onOpenSearch: () -> Unit = {},
+    onCloseSearch: () -> Unit = {},
+    onUpdateSearch: (String) -> Unit = {},
 ) {
     var input by remember { mutableStateOf("") }
+    val context = androidx.compose.ui.platform.LocalContext.current
     val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
     val onCopy: (String) -> Unit = { text ->
         clipboard.setText(androidx.compose.ui.text.AnnotatedString(text))
@@ -155,50 +163,89 @@ fun ChatScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Column(Modifier.clickable { onOpenPicker() }) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (state.searchOpen) {
+                TopAppBar(
+                    title = {
+                        OutlinedTextField(
+                            value = state.searchQuery,
+                            onValueChange = onUpdateSearch,
+                            placeholder = { Text("Search messages...") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                        )
+                    },
+                    actions = {
+                        IconButton(onClick = onCloseSearch) {
+                            Icon(Icons.Filled.Close, contentDescription = "Close search")
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
+                )
+            } else {
+                TopAppBar(
+                    title = {
+                        Column(Modifier.clickable { onOpenPicker() }) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    state.activeModel?.name ?: "Local model",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                Spacer(Modifier.width(4.dp))
+                                Icon(
+                                    Icons.Filled.ArrowDropDown,
+                                    contentDescription = "Switch model",
+                                    tint = OmniPalette.ok,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            }
                             Text(
-                                state.activeModel?.name ?: "Local model",
-                                style = MaterialTheme.typography.titleMedium,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            Spacer(Modifier.width(4.dp))
-                            Icon(
-                                Icons.Filled.ArrowDropDown,
-                                contentDescription = "Switch model",
-                                tint = OmniPalette.ok,
-                                modifier = Modifier.size(20.dp),
+                                // This line is the promise made visible: this model, this chat.
+                                "its own chat · ${state.messages.count { it.role != "system" }} messages" +
+                                    if (state.contextSources.isNotEmpty())
+                                        " · reading ${state.contextSources.size}" else "",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (state.contextSources.isEmpty())
+                                    MaterialTheme.colorScheme.onSurfaceVariant else OmniPalette.info,
                             )
                         }
-                        Text(
-                            // This line is the promise made visible: this model, this chat.
-                            "its own chat · ${state.messages.count { it.role != "system" }} messages" +
-                                if (state.contextSources.isNotEmpty())
-                                    " · reading ${state.contextSources.size}" else "",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = if (state.contextSources.isEmpty())
-                                MaterialTheme.colorScheme.onSurfaceVariant else OmniPalette.info,
-                        )
-                    }
-                },
-                actions = {
-                    IconButton(onClick = onOpenContextSheet) {
-                        Icon(
-                            Icons.Filled.MenuBook,
-                            contentDescription = "Read context from other chats",
-                            tint = if (state.contextSources.isEmpty()) MaterialTheme.colorScheme.onSurfaceVariant
-                            else OmniPalette.info,
-                        )
-                    }
-                    IconButton(onClick = onAskClear) {
-                        Icon(Icons.Filled.DeleteSweep, contentDescription = "Delete this chat")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
-            )
+                    },
+                    actions = {
+                        IconButton(onClick = onOpenSearch) {
+                            Icon(Icons.Filled.Search, contentDescription = "Search messages")
+                        }
+                        IconButton(onClick = {
+                            val conversationText = state.messages
+                                .filter { it.role != "system" }
+                                .joinToString("\n\n") { "${if (it.role == "user") "User" else "Assistant"}: ${it.content}" }
+                            if (conversationText.isNotBlank()) {
+                                val sendIntent = Intent().apply {
+                                    action = Intent.ACTION_SEND
+                                    putExtra(Intent.EXTRA_TEXT, conversationText)
+                                    type = "text/plain"
+                                }
+                                val shareIntent = Intent.createChooser(sendIntent, "Share Conversation")
+                                context.startActivity(shareIntent)
+                            }
+                        }) {
+                            Icon(Icons.Filled.Share, contentDescription = "Share conversation")
+                        }
+                        IconButton(onClick = onOpenContextSheet) {
+                            Icon(
+                                Icons.Filled.MenuBook,
+                                contentDescription = "Read context from other chats",
+                                tint = if (state.contextSources.isEmpty()) MaterialTheme.colorScheme.onSurfaceVariant
+                                else OmniPalette.info,
+                            )
+                        }
+                        IconButton(onClick = onAskClear) {
+                            Icon(Icons.Filled.DeleteSweep, contentDescription = "Delete this chat")
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
+                )
+            }
         },
         containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
@@ -283,8 +330,24 @@ fun ChatScreen(
                 }
             }
 
-            if (state.messages.isEmpty()) {
-                EmptyState(state)
+            val displayMessages = state.filteredMessages ?: state.messages
+            if (displayMessages.isEmpty()) {
+                if (state.filteredMessages != null) {
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .padding(32.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            "No messages matching \"${state.searchQuery}\"",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                } else {
+                    EmptyState(state)
+                }
             } else {
                 LazyColumn(
                     state = listState,
@@ -294,12 +357,12 @@ fun ChatScreen(
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(12.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    items(state.messages, key = { it.id }) { message ->
+                    items(displayMessages, key = { it.id }) { message ->
                         MessageBubble(message, onRetry, onStopGeneration, onCopy)
                     }
                     // One-tap redo of the whole last turn, for when the answer was fine in form
                     // but wrong in substance.
-                    if (!state.busy && state.messages.any { it.role == "assistant" }) {
+                    if (!state.busy && displayMessages.any { it.role == "assistant" } && state.filteredMessages == null) {
                         item {
                             TextButton(
                                 onClick = onRegenerate,
@@ -368,15 +431,22 @@ private fun MessageBubble(
                 bottomStart = if (isUser) 16.dp else 4.dp,
                 bottomEnd = if (isUser) 4.dp else 16.dp,
             ),
-            modifier = Modifier.widthIn(max = 320.dp),
+            modifier = Modifier
+                .widthIn(max = 320.dp)
+                .combinedClickable(
+                    onClick = {},
+                    onLongClick = { onCopy(message.content) },
+                ),
         ) {
             Column(Modifier.padding(12.dp)) {
-                Text(
-                    text = if (message.content.isEmpty() && message.streaming) "…" else message.content,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = if (isUser) MaterialTheme.colorScheme.onPrimaryContainer
-                    else MaterialTheme.colorScheme.onSurface,
-                )
+                if (message.content.isEmpty() && message.streaming) {
+                    Text("…", style = MaterialTheme.typography.bodyLarge)
+                } else {
+                    FormattedText(
+                        text = message.content,
+                        color = if (isUser) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
+                    )
+                }
                 if (message.streaming) {
                     Spacer(Modifier.height(6.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -483,6 +553,84 @@ private fun ContextMeter(state: ChatViewModel.UiState) {
             )
         }
     }
+}
+
+@Composable
+private fun FormattedText(
+    text: String,
+    color: Color,
+    modifier: Modifier = Modifier,
+) {
+    val annotated = remember(text, color) {
+        buildAnnotatedString {
+            var i = 0
+            val len = text.length
+            while (i < len) {
+                if (text.startsWith("```", i)) {
+                    val endBlock = text.indexOf("```", i + 3)
+                    if (endBlock != -1) {
+                        val content = text.substring(i + 3, endBlock).trimStart()
+                        val code = if (content.contains("\n")) content.substringAfter("\n") else content
+                        withStyle(
+                            SpanStyle(
+                                fontFamily = FontFamily.Monospace,
+                                background = Color(0x33888888),
+                                fontSize = 13.sp,
+                            )
+                        ) {
+                            append(code.trimEnd())
+                        }
+                        i = endBlock + 3
+                        continue
+                    }
+                }
+                if (text[i] == '`') {
+                    val end = text.indexOf('`', i + 1)
+                    if (end != -1 && !text.substring(i + 1, end).contains('\n')) {
+                        withStyle(
+                            SpanStyle(
+                                fontFamily = FontFamily.Monospace,
+                                background = Color(0x22888888),
+                                fontSize = 13.sp,
+                            )
+                        ) {
+                            append(text.substring(i + 1, end))
+                        }
+                        i = end + 1
+                        continue
+                    }
+                }
+                if (text.startsWith("**", i)) {
+                    val end = text.indexOf("**", i + 2)
+                    if (end != -1) {
+                        withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
+                            append(text.substring(i + 2, end))
+                        }
+                        i = end + 2
+                        continue
+                    }
+                }
+                if (text[i] == '*' && (i == 0 || text[i - 1] != '*') && (i + 1 < len && text[i + 1] != '*')) {
+                    val end = text.indexOf('*', i + 1)
+                    if (end != -1 && !text.substring(i + 1, end).contains('\n')) {
+                        withStyle(SpanStyle(fontStyle = FontStyle.Italic)) {
+                            append(text.substring(i + 1, end))
+                        }
+                        i = end + 1
+                        continue
+                    }
+                }
+                append(text[i])
+                i++
+            }
+        }
+    }
+    Text(
+        text = annotated,
+        style = MaterialTheme.typography.bodyLarge,
+        color = color,
+        modifier = modifier,
+    )
 }
 
 /** Compact icon button for the reply action row. */

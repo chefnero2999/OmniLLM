@@ -423,6 +423,22 @@ class AgentViewModel(app: Application) : AndroidViewModel(app) {
         refreshProjects()
     }
 
+    fun deleteAllProjects() {
+        val root = File(getApplication<Application>().filesDir, "projects")
+        runCatching {
+            root.listFiles()?.forEach { file ->
+                if (file.isDirectory) file.deleteRecursively()
+            }
+        }
+        _state.value = _state.value.copy(
+            activeSlug = null,
+            previewPath = null,
+            fileCount = 0,
+            log = emptyList(),
+        )
+        refreshProjects()
+    }
+
     fun refreshPreview() {
         _state.value = _state.value.copy(previewNonce = _state.value.previewNonce + 1)
     }

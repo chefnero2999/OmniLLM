@@ -111,6 +111,7 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
             warnings = enforced.warnings,
             gpuAvailable = gpu,
             needsReload = needsReload,
+            themeMode = settings.themeMode,
         )
         refreshDraftCandidates()
     }
@@ -232,6 +233,10 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setUnrestrictedMode(value: Boolean) {
         viewModelScope.launch { container.settings.setUnrestrictedMode(value) }
+    }
+
+    fun setThemeMode(value: String) {
+        update { it.copy(themeMode = value) }
     }
 
     fun applyDeviceDefaults() {
