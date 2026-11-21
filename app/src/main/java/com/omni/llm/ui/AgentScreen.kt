@@ -423,7 +423,29 @@ private fun ActivityPane(state: AgentViewModel.UiState) {
     LaunchedEffect(state.log.size) {
         if (state.log.isNotEmpty()) listState.animateScrollToItem(state.log.lastIndex)
     }
-    LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
+    Column(Modifier.fillMaxSize()) {
+        if (state.running) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    "Working...",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = OmniPalette.ok,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    "Step ${state.log.count { it.kind == AgentViewModel.Line.Kind.ACTION || it.kind == AgentViewModel.Line.Kind.THOUGHT }} of max 24",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
         items(state.log) { line ->
             val colour = when (line.kind) {
                 AgentViewModel.Line.Kind.THOUGHT -> MaterialTheme.colorScheme.onSurfaceVariant
