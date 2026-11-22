@@ -520,6 +520,26 @@ fun SettingsScreen(
                 }
             }
 
+            SectionCard("About & Credits") {
+                Text(
+                    "OmniLLM Studio",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontSize = 15.sp,
+                    color = OmniPalette.ok,
+                )
+                Text(
+                    "Autonomous on-device & keyless cloud agent workstation for Android.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+                InfoRow("Author / Creator", "chefnero2999")
+                InfoRow("Architecture", "arm64-v8a (SIMD + Vulkan)")
+                InfoRow("Engine", "llama.cpp + keyless cloud router")
+                InfoRow("License", "Apache 2.0")
+            }
+
             state.info?.let {
                 Text(it, style = MaterialTheme.typography.bodyMedium, color = OmniPalette.ok, fontSize = 12.sp)
             }
