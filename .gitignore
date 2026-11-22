@@ -11,10 +11,14 @@ build/
 # Local machine paths
 local.properties
 
-# IDE
+# IDE & Cache junk
 .idea/
 *.iml
 .DS_Store
+.acside/
+.kotlin/
+core/.cxx/
+app/.cxx/
 
 # Models (gigabytes)
 *.gguf
