@@ -94,6 +94,7 @@ fun AgentScreen(
     onClosePicker: () -> Unit,
     onPickModel: (String) -> Unit,
     onImagePrompt: (String) -> Unit,
+    onSelectImageModel: (String) -> Unit = {},
     onGenerateImage: () -> Unit,
     onDismissImageError: () -> Unit,
     onOpenFiles: (String) -> Unit,
@@ -349,7 +350,7 @@ fun AgentScreen(
             when (pane) {
                 0 -> ActivityPane(state)
                 1 -> PreviewPane(state, onRefreshPreview)
-                else -> ImagePane(state, onImagePrompt, onGenerateImage, onDismissImageError)
+                else -> ImagePane(state, onImagePrompt, onSelectImageModel, onGenerateImage, onDismissImageError)
             }
         }
 
@@ -603,18 +604,36 @@ private fun PreviewPane(state: AgentViewModel.UiState, onReload: () -> Unit) {
 private fun ImagePane(
     state: AgentViewModel.UiState,
     onPrompt: (String) -> Unit,
+    onSelectModel: (String) -> Unit,
     onGenerate: () -> Unit,
     onDismissError: () -> Unit,
 ) {
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(
-                "Sana · free, no account · adds a small watermark",
+                "Keyless Generative Vision Fleet · 100% Free",
                 style = MaterialTheme.typography.labelSmall,
-                fontSize = 10.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = OmniPalette.info,
                 modifier = Modifier.weight(1f),
             )
+        }
+        Spacer(Modifier.height(6.dp))
+
+        // Multi-model selector chips
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            com.omni.llm.data.KeylessCloudRouter.ImageModels.MODELS.take(3).forEach { (id, label) ->
+                val selected = state.selectedImageModel == id
+                FilterChip(
+                    selected = selected,
+                    onClick = { onSelectModel(id) },
+                    label = { Text(id.replace("-", " ").capitalize(), fontSize = 11.sp) },
+                )
+            }
         }
         Spacer(Modifier.height(4.dp))
 
@@ -623,8 +642,8 @@ private fun ImagePane(
             onValueChange = onPrompt,
             modifier = Modifier.fillMaxWidth(),
             enabled = !state.imageBusy,
-            label = { Text("Describe a picture") },
-            placeholder = { Text("a red fox in snow, phone wallpaper") },
+            label = { Text("Describe a scene, UI concept, or character") },
+            placeholder = { Text("cyberpunk neon city street in rain, 8k cinematic") },
             maxLines = 3,
             shape = RoundedCornerShape(12.dp),
         )

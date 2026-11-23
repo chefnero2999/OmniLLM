@@ -346,7 +346,7 @@ fun ChatScreen(
                         )
                     }
                 } else {
-                    EmptyState(state)
+                    EmptyState(state, onSelectStarter = { prompt -> onSend(prompt) })
                 }
             } else {
                 LazyColumn(
@@ -381,27 +381,83 @@ fun ChatScreen(
 }
 
 @Composable
-private fun EmptyState(state: ChatViewModel.UiState) {
+private fun EmptyState(
+    state: ChatViewModel.UiState,
+    onSelectStarter: (String) -> Unit = {},
+) {
     Column(
         Modifier
             .fillMaxSize()
-            .padding(32.dp),
+            .padding(24.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text("OmniLLM", style = MaterialTheme.typography.titleLarge, color = OmniPalette.ok)
-        Spacer(Modifier.height(8.dp))
+        // Living Ambient Aura & Logo (ChatGPT/Gemini inspired)
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(72.dp)
+                .background(
+                    brush = androidx.compose.ui.graphics.Brush.radialGradient(
+                        colors = listOf(OmniPalette.ok.copy(alpha = 0.35f), Color.Transparent),
+                    ),
+                    shape = RoundedCornerShape(36.dp),
+                ),
+        ) {
+            Text("✨", fontSize = 32.sp)
+        }
+        Spacer(Modifier.height(12.dp))
         Text(
-            "Everything runs on this phone. No account, no key, no upload.",
+            "OmniLLM Studio",
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onBackground,
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            "Private on-device inference & resilient keyless cloud intelligence.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
         )
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(24.dp))
+
+        // Dynamic Starter Prompts (Pills)
         Text(
-            state.connectionLabel,
+            "TRY ASKING",
             style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = OmniPalette.ok,
+            letterSpacing = 1.sp,
+            fontWeight = FontWeight.Bold,
         )
+        Spacer(Modifier.height(10.dp))
+        val suggestions = listOf(
+            "🚀 Build a touch-friendly space shooter game in HTML5",
+            "🔍 Explain how neural network weights are quantized to GGUF",
+            "💡 Debug a Kotlin Coroutine StateFlow recomposition issue",
+            "✍️ Draft an executive pitch for an on-device AI app"
+        )
+        Column(
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            suggestions.forEach { prompt ->
+                Card(
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onSelectStarter(prompt) },
+                ) {
+                    Text(
+                        text = prompt,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontSize = 13.sp,
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -439,6 +495,54 @@ private fun MessageBubble(
                 ),
         ) {
             Column(Modifier.padding(12.dp)) {
+                // Reasoning disclosure (Claude / Gemini thinking accordion)
+                if (message.thinking.isNotBlank()) {
+                    var thinkingExpanded by remember { mutableStateOf(false) }
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 8.dp)
+                            .clickable { thinkingExpanded = !thinkingExpanded },
+                    ) {
+                        Column(Modifier.padding(8.dp)) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text("🧠", fontSize = 11.sp)
+                                    Spacer(Modifier.width(4.dp))
+                                    Text(
+                                        "Thought process",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = OmniPalette.info,
+                                        fontWeight = FontWeight.SemiBold,
+                                    )
+                                }
+                                Text(
+                                    if (thinkingExpanded) "Hide" else "Show",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontSize = 10.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            if (thinkingExpanded) {
+                                Spacer(Modifier.height(4.dp))
+                                Text(
+                                    text = message.thinking.trim(),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
+                }
+
                 if (message.content.isEmpty() && message.streaming) {
                     Text("…", style = MaterialTheme.typography.bodyLarge)
                 } else {
@@ -446,6 +550,59 @@ private fun MessageBubble(
                         text = message.content,
                         color = if (isUser) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
                     )
+                }
+
+                // Interactive Claude-style Artifact preview card if HTML/code is present
+                val hasHtmlCode = remember(message.content) {
+                    message.content.contains("```html", ignoreCase = true) ||
+                        (message.content.contains("<!doctype html>", ignoreCase = true) && message.content.contains("</html>", ignoreCase = true))
+                }
+                if (hasHtmlCode && !isUser && !message.streaming) {
+                    var showArtifactSheet by remember { mutableStateOf(false) }
+                    val extractedCode = remember(message.content) {
+                        if (message.content.contains("```html", ignoreCase = true)) {
+                            message.content.substringAfter("```html").substringBefore("```").trim()
+                        } else {
+                            message.content.substringAfter("<!doctype html>").let { "<!doctype html>$it" }.substringBefore("</html>").let { "$it</html>" }.trim()
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = OmniPalette.ok.copy(alpha = 0.12f)),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { showArtifactSheet = true },
+                    ) {
+                        Row(
+                            Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text("⚡", fontSize = 14.sp)
+                            Spacer(Modifier.width(6.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    "Interactive Artifact Ready",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = OmniPalette.ok,
+                                )
+                                Text(
+                                    "Tap to run live interactive preview",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontSize = 10.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            Text("Preview →", style = MaterialTheme.typography.labelSmall, color = OmniPalette.ok)
+                        }
+                    }
+                    if (showArtifactSheet) {
+                        ArtifactPreviewDialog(
+                            html = extractedCode,
+                            onDismiss = { showArtifactSheet = false },
+                        )
+                    }
                 }
                 if (message.streaming) {
                     Spacer(Modifier.height(6.dp))
@@ -643,5 +800,63 @@ private fun ActionIcon(
 ) {
     IconButton(onClick = onClick, modifier = Modifier.size(26.dp)) {
         Icon(icon, contentDescription = label, tint = tint, modifier = Modifier.size(14.dp))
+    }
+}
+
+@Composable
+fun ArtifactPreviewDialog(
+    html: String,
+    onDismiss: () -> Unit,
+) {
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        Card(
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(520.dp),
+        ) {
+            Column(Modifier.fillMaxSize()) {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("✨", fontSize = 16.sp)
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            "Live Artifact Preview",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
+                    IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
+                        Text("✕", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                Box(
+                    Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .background(Color(0xFF0F172A))
+                ) {
+                    androidx.compose.ui.viewinterop.AndroidView(
+                        factory = { ctx ->
+                            android.webkit.WebView(ctx).apply {
+                                settings.javaScriptEnabled = true
+                                settings.domStorageEnabled = true
+                                settings.loadWithOverviewMode = true
+                                settings.useWideViewPort = true
+                                loadDataWithBaseURL("https://local.artifact", html, "text/html", "UTF-8", null)
+                            }
+                        },
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+            }
+        }
     }
 }

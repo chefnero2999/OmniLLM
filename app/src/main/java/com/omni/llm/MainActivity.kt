@@ -173,6 +173,7 @@ private fun OmniShell(
                     onClosePicker = agentVm::closePicker,
                     onPickModel = agentVm::pickBuildModel,
                     onImagePrompt = agentVm::setImagePrompt,
+                    onSelectImageModel = agentVm::setImageModel,
                     onGenerateImage = agentVm::generateImage,
                     onDismissImageError = agentVm::dismissImageError,
                     onOpenFiles = agentVm::openFiles,

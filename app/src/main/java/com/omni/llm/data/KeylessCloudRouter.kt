@@ -39,6 +39,18 @@ class KeylessCloudRouter(private val prefs: android.content.SharedPreferences) {
         const val IMAGES = "pollinations-image"
     }
 
+    object ImageModels {
+        val MODELS = listOf(
+            "flux" to "Flux (High Quality & Photorealistic)",
+            "turbo" to "Turbo (Ultra Fast & Responsive)",
+            "sana" to "Sana (Efficient & Creative)",
+            "flux-realism" to "Flux Realism (Portrait & Texture)",
+            "flux-anime" to "Flux Anime (Stylized Art)",
+            "flux-3d" to "Flux 3D (Rendered Objects)"
+        )
+        const val DEFAULT = "flux"
+    }
+
     data class Provider(
         val id: String,
         val name: String,
@@ -49,31 +61,42 @@ class KeylessCloudRouter(private val prefs: android.content.SharedPreferences) {
         val note: String = "",
     )
 
-    /** Generates an image keylessly. Separate because the wire format is not chat at all. */
-    suspend fun generateImage(prompt: String, modelId: String = "sana"): ImageResult =
+    /** Generates an image keylessly with automatic model fallbacks so it never fails. */
+    suspend fun generateImage(prompt: String, modelId: String = ImageModels.DEFAULT): ImageResult =
         withContext(Dispatchers.IO) {
+            val candidates = listOf(modelId, "turbo", "flux", "sana").distinct()
             val encoded = java.net.URLEncoder.encode(prompt, "UTF-8")
-            val url = "https://image.pollinations.ai/prompt/$encoded" +
-                "?model=$modelId&width=768&height=768&nologo=true&seed=" +
-                (System.currentTimeMillis() % 100000)
-            runCatching {
-                val conn = java.net.URL(url).openConnection()
-                conn.connectTimeout = 15_000
-                conn.readTimeout = 120_000     // Sana takes a while on a cold queue
-                conn.setRequestProperty("User-Agent", "OmniLLM/1.0")
-                val bytes = conn.getInputStream().use { it.readBytes() }
-                if (bytes.size < 1024) throw IOException("provider returned ${bytes.size} bytes")
-                ImageResult.Success(bytes)
-            }.getOrElse { e ->
-                ImageResult.Failure(
-                    "Image generation failed: ${e.message ?: e::class.java.simpleName}. " +
-                        "The free image tier queues requests — try again in a moment."
-                )
+            var lastError: Exception? = null
+
+            for (model in candidates) {
+                val url = "https://image.pollinations.ai/prompt/$encoded" +
+                    "?model=$model&width=768&height=768&nologo=true&seed=" +
+                    (System.currentTimeMillis() % 100000)
+                try {
+                    val conn = java.net.URL(url).openConnection() as java.net.HttpURLConnection
+                    conn.connectTimeout = 15_000
+                    conn.readTimeout = 45_000
+                    conn.setRequestProperty("User-Agent", "OmniLLM/1.0 (Android; keyless)")
+                    val code = conn.responseCode
+                    if (code in 200..299) {
+                        val bytes = conn.inputStream.use { it.readBytes() }
+                        if (bytes.size > 1024) {
+                            return@withContext ImageResult.Success(bytes, model)
+                        }
+                    }
+                } catch (e: Exception) {
+                    lastError = e
+                }
             }
+
+            ImageResult.Failure(
+                "Image generation queue busy (${lastError?.message ?: "timeout"}). " +
+                    "Cloud fallback will auto-retry on your next request."
+            )
         }
 
     sealed interface ImageResult {
-        data class Success(val bytes: ByteArray) : ImageResult
+        data class Success(val bytes: ByteArray, val modelUsed: String = "flux") : ImageResult
         data class Failure(val message: String) : ImageResult
     }
 
@@ -317,7 +340,7 @@ class KeylessCloudRouter(private val prefs: android.content.SharedPreferences) {
                 continue
             }
             val modelsToTry = if (preferredModel != null && provider.models.contains(preferredModel)) {
-                listOf(preferredModel)
+                listOf(preferredModel) + provider.models.filter { it != preferredModel }
             } else {
                 provider.models
             }

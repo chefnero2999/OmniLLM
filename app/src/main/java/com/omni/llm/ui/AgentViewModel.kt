@@ -70,6 +70,7 @@ class AgentViewModel(app: Application) : AndroidViewModel(app) {
         // ---- image generation ---------------------------------------------------------------
         /** Prompt for the image pane; independent of the build prompt. */
         val imagePrompt: String = "",
+        val selectedImageModel: String = com.omni.llm.data.KeylessCloudRouter.ImageModels.DEFAULT,
         val imageBusy: Boolean = false,
         val images: List<GeneratedImage> = emptyList(),
         val imageError: String? = null,
@@ -261,12 +262,12 @@ class AgentViewModel(app: Application) : AndroidViewModel(app) {
         _state.value = _state.value.copy(imagePrompt = value)
     }
 
+    fun setImageModel(modelId: String) {
+        _state.value = _state.value.copy(selectedImageModel = modelId)
+    }
+
     /**
-     * Text-to-image through the keyless image endpoint.
-     *
-     * Kept deliberately separate from chat and builds: the endpoint returns raw JPEG bytes, not
-     * tokens, and it is the one free service here that is genuinely queue-limited. Failing loudly
-     * with "try again in a moment" beats a spinner that never resolves.
+     * Text-to-image through the keyless image endpoint with multi-model failover.
      */
     fun generateImage() {
         val s = _state.value
@@ -274,7 +275,7 @@ class AgentViewModel(app: Application) : AndroidViewModel(app) {
         if (prompt.isEmpty() || s.imageBusy) return
         _state.value = s.copy(imageBusy = true, imageError = null)
         viewModelScope.launch {
-            when (val result = container.cloud.generateImage(prompt)) {
+            when (val result = container.cloud.generateImage(prompt, s.selectedImageModel)) {
                 is com.omni.llm.data.KeylessCloudRouter.ImageResult.Success -> {
                     val dir = File(getApplication<Application>().filesDir, "generated")
                         .apply { mkdirs() }
@@ -282,7 +283,7 @@ class AgentViewModel(app: Application) : AndroidViewModel(app) {
                     runCatching { f.writeBytes(result.bytes) }
                     _state.value = _state.value.copy(
                         imageBusy = false,
-                        images = (listOf(GeneratedImage(f, prompt)) + _state.value.images).take(30),
+                        images = (listOf(GeneratedImage(f, "$prompt · ${result.modelUsed}")) + _state.value.images).take(30),
                         imagePrompt = "",
                     )
                 }

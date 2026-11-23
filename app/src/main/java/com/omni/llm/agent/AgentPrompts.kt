@@ -44,22 +44,20 @@ fun stackRules(stack: AgentEngine.Stack): String = when (stack) {
     AgentEngine.Stack.WEB, AgentEngine.Stack.HTML_GAME -> """
 - Write index.html first so the app has something to preview, then styles.css, then app.js.
 - One file at a time, written completely. No "..." placeholders, ever.
-- It runs inside a WebView over file:// — so:
-  * Use only relative paths. <script src="app.js"></script>, <link href="styles.css">.
-  * External CDNs may be unreachable. Inline any CSS/JS you cannot live without; use inline SVG
-instead of remote images. fetch_url an image into the folder if you truly need a bitmap.
-  * ES modules from file:// are blocked. Use plain <script> with a classic function scope, or a
-single inline script. Do not use type="module".
-  * No build step, no npm, no imports.
-- Make it look deliberate: system font stack, a real colour palette, spacing that breathes,
-  a responsive layout that works at 360 px wide (that is the phone it will be previewed on).
+- It runs inside a mobile WebView over file:// — so:
+  * Use only relative paths: <script src="app.js"></script>, <link href="styles.css" rel="stylesheet">.
+  * External CDNs may be blocked or offline. Inline any critical CSS/JS; use beautiful inline SVG icons instead of remote broken image links.
+  * ES modules from file:// are blocked. Use standard <script> tags or single inline script. Do not use type="module".
+  * No build step, no npm, no bundlers.
+- Visual Quality & UX Polish:
+  * Design with dark-first modern aesthetics: rich deep background (#0f172a, #111827), smooth rounded corners (16px), subtle border glow (#38bdf8, #818cf8), and vibrant accent buttons.
+  * Typography: sleek system font stack (-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif), crisp contrast, and breathable padding.
+  * Mobile-responsive viewport: must look stunning at 360px - 420px mobile widths with touch-friendly 44px+ tap targets.
 - ${if (stack == AgentEngine.Stack.HTML_GAME)
-    "The game must be playable with touch: pointerdown/pointerup or on-screen buttons, " +
-    "requestAnimationFrame loop, and it must not depend on a keyboard."
+    "Game Architecture: Use an HTML5 <canvas> or reactive DOM with requestAnimationFrame. Include sound effects via Web Audio API oscillators (beeps/booms with no external audio files needed!), responsive on-screen virtual joypad/touch controls, high-score tracking in localStorage, particle effects on hits/points, and a vivid GameOver / Restart screen."
 else
-    "Interactive parts need to work with touch, not hover."}
-- Finish only after every file is written and the pieces connect: check that every id/class your
-  JS queries actually exists in the HTML.
+    "Web App Architecture: Fast responsive layouts, smooth CSS transitions (0.2s ease), tactile click feedback (transform: scale(0.97)), dynamic state management in pure JS, and localStorage for state persistence."}
+- Finish only after every file is written and the pieces connect: check that every id/class your JS queries actually exists in the HTML.
 """.trim()
     AgentEngine.Stack.ANDROID -> """
 - A real Gradle project is already scaffolded: settings.gradle.kts, build.gradle.kts,

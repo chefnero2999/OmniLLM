@@ -534,9 +534,10 @@ fun SettingsScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
-                InfoRow("Author / Creator", "chefnero2999")
+                InfoRow("App Creator & Designer", "chefnero2999")
+                InfoRow("Runtime Engine", "llama.cpp (compiled by open-source community)")
+                InfoRow("Cloud Models", "Public keyless inference endpoints (OVH / LLM7 / Pollinations)")
                 InfoRow("Architecture", "arm64-v8a (SIMD + Vulkan)")
-                InfoRow("Engine", "llama.cpp + keyless cloud router")
                 InfoRow("License", "Apache 2.0")
             }
 
