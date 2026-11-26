@@ -72,7 +72,10 @@ class IsolationAndActionsTest {
 
     // The real asset, read at test time so the assertion cannot drift from the shipped catalogue.
     private val UNCENSORED_JSON: String
-        get() = java.io.File("app/src/main/assets/models.json").readText()
+        get() = (listOf(
+            java.io.File("src/main/assets/models.json"),
+            java.io.File("app/src/main/assets/models.json"),
+        ).firstOrNull { it.exists() } ?: error("models.json not found")).readText()
 
     private val JSON = Json { ignoreUnknownKeys = true; isLenient = true }
 
@@ -81,7 +84,7 @@ class IsolationAndActionsTest {
         // No login, no signup, no pasted key. Any model whose provider needs a bearer token would
         // silently 401 for every user, so the catalogue must not contain one.
         // The only providers OmniLLM ships; none of them takes a key.
-        val keyless = setOf("pollinations", "pollinations-image", "llm7", "ovh")
+        val keyless = setOf("pollinations", "pollinations-image", "llm7", "ovh", "local")
         val keyed = ModelCatalog.models.filter { it.providerId !in keyless }
         assertTrue("models behind a credential: ${keyed.map { it.name }}", keyed.isEmpty())
     }

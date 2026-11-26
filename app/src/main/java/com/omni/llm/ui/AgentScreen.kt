@@ -1,5 +1,6 @@
 package com.omni.llm.ui
 
+import androidx.compose.foundation.BorderStroke
 import com.omni.llm.data.ProjectFile
 
 import android.annotation.SuppressLint
@@ -154,79 +155,70 @@ fun AgentScreen(
         return
     }
 
-    Column(Modifier.fillMaxSize().padding(horizontal = 14.dp)) {
+    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(horizontal = 14.dp)) {
         Spacer(Modifier.height(10.dp))
 
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Filled.Build, contentDescription = null, tint = OmniPalette.ok)
-            Spacer(Modifier.width(8.dp))
-            Text(
-                "Build",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onBackground,
-            )
-            Spacer(Modifier.weight(1f))
-            state.activeSlug?.let { slug ->
-                AssistChip(
-                    onClick = { onOpenFiles(slug) },
-                    label = { Text("Files", fontSize = 11.sp) },
-                    colors = AssistChipDefaults.assistChipColors(
-                        containerColor = MaterialTheme.colorScheme.surface,
-                    ),
-                    border = null,
-                )
-                Spacer(Modifier.width(6.dp))
-            }
-            if (state.running) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(16.dp),
-                    strokeWidth = 2.dp,
-                    color = OmniPalette.info,
-                )
-                Spacer(Modifier.width(6.dp))
-                Text("working", color = OmniPalette.info, fontSize = 12.sp)
-            }
-        }
-        Text(
-            "Describe an app or a website. A free model builds it file by file, and you can run it here.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(Modifier.height(6.dp))
-
-        // Which model builds. Visible and changeable, never an invisible default.
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(10.dp))
-                .clickable(enabled = !state.running) { onOpenPicker() }
-                .padding(horizontal = 10.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
+        // Forge Telemetry Capsule Header (matches Workspace, Vault, and Core V3)
+        androidx.compose.material3.Surface(
+            shape = RoundedCornerShape(18.dp),
+            color = MaterialTheme.colorScheme.surface,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+            modifier = Modifier.fillMaxWidth().clickable(enabled = !state.running) { onOpenPicker() },
         ) {
-            Icon(Icons.Filled.Build, contentDescription = null, tint = OmniPalette.ok, modifier = Modifier.size(15.dp))
-            Spacer(Modifier.width(8.dp))
-            Column(Modifier.weight(1f)) {
-                Text(
-                    "Builder: ${state.buildModel.name}",
-                    style = MaterialTheme.typography.bodySmall,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurface,
+            Row(
+                Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    Modifier
+                        .size(9.dp)
+                        .background(
+                            if (state.running) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.primary,
+                            androidx.compose.foundation.shape.CircleShape
+                        )
                 )
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        "FORGE WORKBENCH · ${if (state.running) "BUILDING..." else "READY"}",
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                    Text(
+                        "Builder: ${state.buildModel.name}",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        state.buildModel.blurb,
+                        fontSize = 10.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                state.activeSlug?.let { slug ->
+                    QuickModePill(
+                        label = "📂 Files",
+                        active = false,
+                        tint = MaterialTheme.colorScheme.secondary,
+                        onClick = { onOpenFiles(slug) },
+                    )
+                    Spacer(Modifier.width(6.dp))
+                }
                 Text(
-                    state.buildModel.blurb,
-                    style = MaterialTheme.typography.labelSmall,
+                    if (state.running) "busy" else "switch",
+                    fontFamily = FontFamily.Monospace,
                     fontSize = 10.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+                    color = MaterialTheme.colorScheme.primary,
                 )
             }
-            Text(
-                if (state.running) "busy" else "change",
-                fontSize = 11.sp,
-                color = OmniPalette.ok,
-            )
         }
         Spacer(Modifier.height(10.dp))
 
@@ -304,15 +296,15 @@ fun AgentScreen(
                 onClick = onBuild,
                 enabled = !state.running,
                 modifier = Modifier.weight(1f),
-                colors = ButtonDefaults.buttonColors(containerColor = OmniPalette.ok, contentColor = Color(0xFF04140A)),
-                shape = RoundedCornerShape(10.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary),
+                shape = RoundedCornerShape(12.dp),
             ) {
                 Icon(Icons.Filled.Send, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(6.dp))
-                Text(if (state.activeSlug == null) "Build" else "Build again", fontWeight = FontWeight.SemiBold)
+                Text(if (state.activeSlug == null) "Build" else "Build again", fontWeight = FontWeight.Bold)
             }
             if (state.running) {
-                OutlinedButton(onClick = onStop, shape = RoundedCornerShape(10.dp)) {
+                OutlinedButton(onClick = onStop, shape = RoundedCornerShape(12.dp)) {
                     Icon(Icons.Filled.Close, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(4.dp))
                     Text("Stop")
@@ -322,25 +314,23 @@ fun AgentScreen(
         Spacer(Modifier.height(10.dp))
 
         // ------------------------------------------------------------- panes
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             listOf(
-                "Activity" to state.log.size,
-                "Preview" to state.fileCount,
-                "Images" to state.images.size,
+                "⚡ Activity" to state.log.size,
+                "📱 Simulator" to state.fileCount,
+                "🎨 Image Fleet" to state.images.size,
             ).forEachIndexed { i, (label, count) ->
-                AssistChip(
+                QuickModePill(
+                    label = label + if (i == 1 && count > 0) " · $count" else "",
+                    active = pane == i,
+                    tint = MaterialTheme.colorScheme.primary,
                     onClick = { pane = i },
-                    label = { Text("$label" + if (i == 1 && count > 0) " · $count files" else "", fontSize = 12.sp) },
-                    colors = AssistChipDefaults.assistChipColors(
-                        containerColor = if (pane == i) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent,
-                    ),
-                    border = null,
                 )
             }
             Spacer(Modifier.weight(1f))
             if (pane == 1) {
                 IconButton(onClick = onRefreshPreview, modifier = Modifier.size(32.dp)) {
-                    Icon(Icons.Filled.Refresh, contentDescription = "Reload preview", tint = OmniPalette.info, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Filled.Refresh, contentDescription = "Reload preview", tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(18.dp))
                 }
             }
         }
@@ -517,50 +507,86 @@ private fun PreviewPane(state: AgentViewModel.UiState, onReload: () -> Unit) {
         }
     }
 
-    Column(Modifier.fillMaxSize()) {
+    Column(
+        Modifier
+            .fillMaxSize()
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+    ) {
         error?.let {
             Text(it, color = OmniPalette.danger, fontSize = 11.sp, modifier = Modifier.padding(4.dp))
         }
-        AndroidView(
+        // Sleek Device Shell Frame
+        Card(
             modifier = Modifier
-                .fillMaxSize()
-                .background(Color(0xFF0B0F14))
-                .padding(0.dp),
-            factory = { ctx ->
-                WebView(ctx).apply {
-                    webView.value = this
-                    settings.javaScriptEnabled = true
-                    settings.domStorageEnabled = true
-                    settings.allowFileAccess = true
-                    settings.allowFileAccessFromFileURLs = true
-                    settings.allowUniversalAccessFromFileURLs = false
-                    settings.loadWithOverviewMode = true
-                    settings.useWideViewPort = true
-                    settings.mediaPlaybackRequiresUserGesture = false
-                    webChromeClient = object : WebChromeClient() {
-                        override fun onConsoleMessage(msg: ConsoleMessage?): Boolean {
-                            // Surfacing JS errors turns "it is blank" into a fixable message.
-                            val text = msg?.message().orEmpty()
-                            if (!text.isNullOrBlank()) error = "console: $text"
-                            return true
-                        }
-                    }
-                    webViewClient = object : WebViewClient() {
-                        override fun onPageFinished(view: WebView?, url: String?) {
-                            error = null
-                        }
-                    }
-                    loadedNonce.value = state.previewNonce
-                    loadUrl("file://${path.absolutePath}")
+                .weight(1f)
+                .fillMaxWidth(),
+            shape = RoundedCornerShape(24.dp),
+            border = BorderStroke(2.dp, OmniPalette.ok.copy(alpha = 0.35f)),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF0B0F14)),
+        ) {
+            Column(Modifier.fillMaxSize()) {
+                // Device Frame Speaker / Camera Notch
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp, bottom = 4.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(width = 50.dp, height = 4.dp)
+                            .background(Color.White.copy(alpha = 0.25f), shape = RoundedCornerShape(2.dp))
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .background(Color.White.copy(alpha = 0.35f), shape = RoundedCornerShape(3.dp))
+                    )
                 }
-            },
-            update = { view ->
-                if (loadedNonce.value != state.previewNonce) {
-                    loadedNonce.value = state.previewNonce
-                    view.loadUrl("file://${path.absolutePath}?v=${state.previewNonce}")
-                }
-            },
-        )
+                AndroidView(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .padding(horizontal = 4.dp, vertical = 2.dp),
+                    factory = { ctx ->
+                        WebView(ctx).apply {
+                            webView.value = this
+                            settings.javaScriptEnabled = true
+                            settings.domStorageEnabled = true
+                            settings.allowFileAccess = true
+                            settings.allowFileAccessFromFileURLs = true
+                            settings.allowUniversalAccessFromFileURLs = false
+                            settings.loadWithOverviewMode = true
+                            settings.useWideViewPort = true
+                            settings.mediaPlaybackRequiresUserGesture = false
+                            webChromeClient = object : WebChromeClient() {
+                                override fun onConsoleMessage(msg: ConsoleMessage?): Boolean {
+                                    val text = msg?.message().orEmpty()
+                                    if (!text.isNullOrBlank()) error = "console: $text"
+                                    return true
+                                }
+                            }
+                            webViewClient = object : WebViewClient() {
+                                override fun onPageFinished(view: WebView?, url: String?) {
+                                    error = null
+                                }
+                            }
+                            loadedNonce.value = state.previewNonce
+                            loadUrl("file://${path.absolutePath}")
+                        }
+                    },
+                    update = { view ->
+                        if (loadedNonce.value != state.previewNonce) {
+                            loadedNonce.value = state.previewNonce
+                            view.loadUrl("file://${path.absolutePath}?v=${state.previewNonce}")
+                        }
+                    },
+                )
+            }
+        }
+        Spacer(Modifier.height(4.dp))
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp),

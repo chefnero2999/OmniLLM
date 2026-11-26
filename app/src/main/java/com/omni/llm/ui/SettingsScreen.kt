@@ -1,8 +1,11 @@
 package com.omni.llm.ui
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,12 +15,17 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -28,14 +36,14 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -43,17 +51,74 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.omni.llm.ui.theme.ACCENT_OPTIONS
+import com.omni.llm.ui.theme.FONT_OPTIONS
 import com.omni.llm.ui.theme.OmniPalette
 import com.omni.llm.util.Formatters
+import java.util.Locale
 import kotlin.math.roundToInt
 
-/**
- * Two-level settings: the toggles a normal person needs on top, the knobs that can crash the app
- * behind "Advanced (Danger Zone)". Every control carries a one-line plain-English trade-off.
- */
+private data class ChangelogEntry(
+    val version: String,
+    val title: String,
+    val date: String,
+    val badge: String,
+    val notes: List<String>,
+)
+
+private val BUILD_CHANGELOGS = listOf(
+    ChangelogEntry(
+        version = "v3.2",
+        title = "Unified Obsidian/Frost V3, 200K Window & Core Customization",
+        date = "2026-11-26",
+        badge = "LATEST",
+        notes = listOf(
+            "Carried the V3 Telemetry Capsule & Timeline aesthetic cleanly across Vault (Models), Forge (Build), and Core (Settings).",
+            "Fixed Light Mode contrast across all surfaces + added live Accent Color & Typography Font Pickers.",
+            "Fixed Unrestricted Mode DataStore persistence so it stays enabled across reloads.",
+            "Expanded Context Length & Max Answer Length up to 200,000 tokens with live RAM/limit warnings past 8,000 tokens.",
+            "Redesigned About & Credits for chefnero2999 and introduced this Changelog viewer.",
+        ),
+    ),
+    ChangelogEntry(
+        version = "v3.1",
+        title = "Obsidian Volt V3 Workspace & Multimodal Upload Engine",
+        date = "2026-11-26",
+        badge = "MAJOR",
+        notes = listOf(
+            "Fixed persistent cloud-mode 'No model is loaded' post-generation error in ChatViewModel.",
+            "Replaced generic chat bubbles with a Vertical Timeline Spine, Obsidian Code Deck cards, and ▶ RUN LIVE artifacts.",
+            "Added Image/Vision uploads (auto-routed to Qwen3-VL) + PDF/Document text extraction + Live Deep Web Search citations.",
+            "Added Android TextToSpeech Read Aloud, Edit & Resend, and live Arena/Studio execution.",
+        ),
+    ),
+    ChangelogEntry(
+        version = "v2.0",
+        title = "Autonomous Forge, Live Voice & Multi-Image Fleet",
+        date = "2026-11-23",
+        badge = "ENGINE",
+        notes = listOf(
+            "Added multi-model keyless image generator (Flux, Turbo, Sana, Realism, Anime, 3D) with persistence.",
+            "Wired SpeechRecognizer live voice overlay and fixed idle WakeLock battery drain in LlmService.",
+        ),
+    ),
+    ChangelogEntry(
+        version = "v1.0",
+        title = "OmniLLM Hybrid Foundation",
+        date = "2026-11-18",
+        badge = "BASE",
+        notes = listOf(
+            "Built isolated :llm inference service over llama.cpp (arm64-v8a SIMD + Vulkan) with keyless cloud router.",
+        ),
+    ),
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
@@ -77,11 +142,15 @@ fun SettingsScreen(
     onAutoSwitchModels: (Boolean) -> Unit,
     onUnrestrictedMode: (Boolean) -> Unit,
     onThemeMode: (String) -> Unit = {},
+    onAccentColor: (String) -> Unit = {},
+    onFontFamily: (String) -> Unit = {},
     onApplyDefaults: () -> Unit,
     onPanic: () -> Unit,
     onClearCrashLog: () -> Unit,
     onDismissNotice: () -> Unit,
 ) {
+    // 0 = Controls, 1 = Changelog, 2 = Credits
+    var subTab by remember { mutableStateOf(0) }
     var advanced by remember { mutableStateOf(false) }
     var confirmPanic by remember { mutableStateOf(false) }
     var confirmGpu by remember { mutableStateOf(false) }
@@ -89,462 +158,437 @@ fun SettingsScreen(
     var promptDraft by remember { mutableStateOf(state.settings.systemPrompt) }
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Settings") },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
-            )
-        },
         containerColor = MaterialTheme.colorScheme.background,
+        topBar = {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.background)
+                    .padding(horizontal = 14.dp, vertical = 10.dp)
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(18.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Row(
+                        Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Box(
+                            Modifier
+                                .size(9.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.primary)
+                        )
+                        Spacer(Modifier.width(10.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text("CORE CONFIGURATION", fontFamily = FontFamily.Monospace, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                            Text("Engine, Appearance, Changelogs & Attribution", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(8.dp))
+
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    QuickModePill("⚙️ Controls", active = subTab == 0, tint = MaterialTheme.colorScheme.primary, onClick = { subTab = 0 })
+                    QuickModePill("📜 Changelog", active = subTab == 1, tint = MaterialTheme.colorScheme.secondary, onClick = { subTab = 1 })
+                    QuickModePill("✨ About & Credits", active = subTab == 2, tint = OmniPalette.copper, onClick = { subTab = 2 })
+                }
+            }
+        },
     ) { padding ->
         Column(
             Modifier
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp),
+                .padding(horizontal = 14.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            state.settings.pendingCrashNotice?.let { notice ->
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = OmniPalette.danger.copy(alpha = 0.16f)),
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Column(Modifier.padding(12.dp)) {
-                        Text("Crash recovered", fontWeight = FontWeight.SemiBold)
-                        Text(notice, style = MaterialTheme.typography.bodyMedium)
-                        TextButton(onClick = onDismissNotice) { Text("Got it") }
-                    }
-                }
-            }
-
-            if (state.needsReload) {
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = OmniPalette.warn.copy(alpha = 0.16f)),
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Column(Modifier.padding(12.dp)) {
-                        Text("Reload required", fontWeight = FontWeight.SemiBold, color = OmniPalette.warn)
-                        Text(
-                            "Context length, threads, batch, GPU layers and mmap only apply when the model " +
-                                "is loaded. Unload and load it again in the Models tab to apply them.",
-                            style = MaterialTheme.typography.bodyMedium, fontSize = 12.sp,
-                        )
-                    }
-                }
-            }
-
-            SectionCard("Appearance") {
-                Text(
-                    "Theme",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontSize = 15.sp,
-                )
-                Text(
-                    "Choose between dark mode, light mode, or match your device system setting.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.height(8.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    val currentMode = state.themeMode
-                    listOf("system" to "System", "dark" to "Dark", "light" to "Light").forEach { (mode, label) ->
-                        val selected = currentMode == mode
-                        if (selected) {
-                            Button(
-                                onClick = { onThemeMode(mode) },
-                                modifier = Modifier.weight(1f),
-                            ) {
-                                Text(label, fontSize = 13.sp)
-                            }
-                        } else {
-                            OutlinedButton(
-                                onClick = { onThemeMode(mode) },
-                                modifier = Modifier.weight(1f),
-                            ) {
-                                Text(label, fontSize = 13.sp)
+            when (subTab) {
+                1 -> ChangelogPane()
+                2 -> CreditsPane()
+                else -> {
+                    state.settings.pendingCrashNotice?.let { notice ->
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = OmniPalette.danger.copy(alpha = 0.14f)),
+                            border = BorderStroke(1.dp, OmniPalette.danger.copy(alpha = 0.4f)),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Column(Modifier.padding(12.dp)) {
+                                Text("Crash recovered", fontWeight = FontWeight.Bold, color = OmniPalette.danger)
+                                Text(notice, style = MaterialTheme.typography.bodySmall)
+                                TextButton(onClick = onDismissNotice) { Text("Got it") }
                             }
                         }
                     }
-                }
-            }
 
-            SectionCard("Device") {
-                InfoRow("Model", state.profile.model)
-                InfoRow("RAM", String.format("%.1f GB total · %.1f GB free", state.profile.totalRamGb, state.profile.availRamGb))
-                InfoRow("Cores", "${state.profile.cores} (${state.profile.performanceCores} performance)")
-                InfoRow("Thermals", containerThermalLabel(state))
-                InfoRow("GPU (Vulkan)", if (state.gpuAvailable) "available" else "not compiled in this build")
-                Text(
-                    "Defaults for this device: ${state.defaults.contextLength} ctx · ${state.defaults.gpuLayers} GPU layers · " +
-                        "${state.defaults.threads} threads",
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.height(8.dp))
-                OutlinedButton(onClick = onApplyDefaults) { Text("Reset to device defaults") }
-            }
-
-            SectionCard("Everyday") {
-                SwitchRow(
-                    title = "Cloud fallback",
-                    description = "Off by default. When on and no local model is loaded, prompts go to a keyless provider. " +
-                        "Nothing is sent while local inference is active.",
-                    checked = state.settings.cloudFallbackEnabled,
-                    onChange = onCloudEnabled,
-                )
-
-                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
-                SwitchRow(
-                    title = "Auto-switch models",
-                    description = "When the model you picked is rate-limited, out of free quota, " +
-                        "or simply broken, move to the next free model and keep going. In Chat it " +
-                        "continues the conversation; in Build it resumes mid-task from the files " +
-                        "already written.",
-                    checked = state.settings.autoSwitchModels,
-                    onChange = onAutoSwitchModels,
-                )
-                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
-                SwitchRow(
-                    title = "Unrestricted mode",
-                    description = "Removes OmniLLM's own hedging from the system prompt and puts " +
-                        "unfiltered models first in the picker. Be clear on the limit: this cannot " +
-                        "turn off a cloud provider's server-side filter — only the provider can. " +
-                        "Local uncensored models (Models tab → Uncensored) have no filter at all, " +
-                        "because nothing leaves the phone.",
-                    checked = state.settings.unrestrictedMode,
-                    onChange = onUnrestrictedMode,
-                )
-
-                if (state.settings.cloudFallbackEnabled) {
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
-                    Text(
-                        "Which cloud model to use now lives in the Chat tab — tap the model name at " +
-                            "the top. Each model there keeps its own conversation.",
-                        style = MaterialTheme.typography.bodySmall,
-                        fontSize = 11.sp,
-                        color = OmniPalette.info,
-                    )
-                }
-                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
-                SliderRow(
-                    title = "Temperature",
-                    description = "Higher = more creative, lower = more deterministic. 0.7 is a good default.",
-                    value = state.settings.temperature,
-                    valueRange = 0f..1.5f,
-                    steps = 14,
-                    label = Formatters.compact(state.settings.temperature),
-                    onChange = onTemperature,
-                )
-                SliderRow(
-                    title = "Top-P",
-                    description = "Nucleus sampling cutoff. Lower narrows the word pool; 0.9 is a " +
-                        "good default. This was stored but had no control until now.",
-                    value = state.settings.topP,
-                    valueRange = 0.1f..1f,
-                    steps = 8,
-                    label = Formatters.compact(state.settings.topP),
-                    onChange = onTopP,
-                )
-                SliderRow(
-                    title = "Max answer length",
-                    description = "Hard cap on generated tokens per reply. Lower is faster and safer.",
-                    value = state.settings.maxTokens.toFloat(),
-                    valueRange = 64f..2048f,
-                    steps = 30,
-                    label = "${state.settings.maxTokens} tokens",
-                    onChange = { onMaxTokens(it.roundToInt()) },
-                )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text("System prompt", fontWeight = FontWeight.Medium)
-                        Text(
-                            state.settings.systemPrompt.take(90) + if (state.settings.systemPrompt.length > 90) "…" else "",
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    TextButton(onClick = { promptDraft = state.settings.systemPrompt; promptEditing = true }) {
-                        Text("Edit")
-                    }
-                }
-            }
-
-            OutlinedButton(
-                onClick = { advanced = !advanced },
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(if (advanced) "Hide advanced settings" else "Advanced (Danger Zone)")
-                Icon(
-                    if (advanced) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
-                    contentDescription = null,
-                )
-            }
-
-            AnimatedVisibility(visible = advanced) {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    SectionCard("Context & memory") {
-                        SliderRow(
-                            title = "Context length",
-                            description = "Total tokens the model can hold (prompt + answer). " +
-                                "Estimated KV cache: ${Formatters.bytes(state.kvEstimateBytes)}. " +
-                                "Bigger context = more RAM and slower prompt processing.",
-                            value = state.settings.contextLength.toFloat(),
-                            valueRange = 512f..state.caps.maxContext.toFloat(),
-                            steps = (state.caps.maxContext / 512) - 1,
-                            label = "${state.settings.contextLength} tokens ≈ ${Formatters.bytes(state.kvEstimateBytes)} KV",
-                            onChange = { raw ->
-                                val snapped = ((raw / 512f).roundToInt() * 512).coerceIn(512, state.caps.maxContext)
-                                onContextLength(snapped)
-                            },
-                        )
-                        SwitchRow(
-                            title = "Memory-map the model (mmap)",
-                            description = "Zero-copy file-backed weights instead of a private heap copy. " +
-                                "This is the single biggest protection against the Low Memory Killer. Leave it on.",
-                            checked = state.settings.useMmap,
-                            onChange = onMmap,
-                        )
-                        SwitchRow(
-                            title = "Lock model in RAM (mlock)",
-                            description = "Stops the kernel evicting weights, so generation does not stall on I/O. " +
-                                "Uses more memory and can trigger the killer on 4 GB phones.",
-                            checked = state.settings.useMlock,
-                            onChange = onMlock,
-                        )
-                        SwitchRow(
-                            title = "Quantised KV cache (Q8)",
-                            description = "Halves KV cache RAM. Requires flash attention; may reduce answer quality slightly.",
-                            checked = state.settings.q8KvCache,
-                            onChange = onQ8Kv,
-                        )
-                    }
-
-                    SectionCard("Speculative decoding") {
-                        SwitchRow(
-                            title = "Use a draft model",
-                            description = "A small model guesses the next few tokens, the main model checks them " +
-                                "in one pass. Only pays off when the draft is much cheaper than the target and the " +
-                                "phone has RAM for both — on many phones this is SLOWER, so measure before keeping it. " +
-                                "Off by default.",
-                            checked = state.settings.speculativeEnabled,
-                            onChange = onSpeculativeEnabled,
-                        )
-                        if (state.settings.speculativeEnabled) {
-                            val chosen = state.settings.draftModelId
-                            if (state.draftCandidates.isEmpty()) {
+                    if (state.needsReload) {
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = OmniPalette.copper.copy(alpha = 0.14f)),
+                            border = BorderStroke(1.dp, OmniPalette.copper.copy(alpha = 0.4f)),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Column(Modifier.padding(12.dp)) {
+                                Text("Reload required", fontWeight = FontWeight.Bold, color = OmniPalette.copper)
                                 Text(
-                                    "No other downloaded model is available. Download a smaller model first " +
-                                        "and it will appear here.",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontSize = 12.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    "Engine parameters apply on next model load in the Vault tab.",
+                                    style = MaterialTheme.typography.bodySmall,
                                 )
-                            } else {
-                                Text(
-                                    "Draft model", fontWeight = FontWeight.Medium, fontSize = 13.sp,
-                                )
-                                state.draftCandidates.forEach { entry ->
-                                    val selected = entry.id == chosen
+                            }
+                        }
+                    }
+
+                    // Appearance: Theme + Accent + Font Picker
+                    SectionCard("Appearance & Typography") {
+                        Text("Theme Mode", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            listOf("system" to "System", "dark" to "Obsidian Dark", "light" to "Frost Light").forEach { (mode, label) ->
+                                val selected = state.themeMode == mode
+                                if (selected) {
+                                    Button(onClick = { onThemeMode(mode) }, modifier = Modifier.weight(1f), shape = RoundedCornerShape(10.dp)) {
+                                        Text(label, fontSize = 11.sp, maxLines = 1)
+                                    }
+                                } else {
+                                    OutlinedButton(onClick = { onThemeMode(mode) }, modifier = Modifier.weight(1f), shape = RoundedCornerShape(10.dp)) {
+                                        Text(label, fontSize = 11.sp, maxLines = 1)
+                                    }
+                                }
+                            }
+                        }
+
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
+
+                        Text("Accent Color", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            ACCENT_OPTIONS.forEach { opt ->
+                                val selected = state.accentColor == opt.id
+                                val swatch = opt.darkPrimary
+                                Surface(
+                                    onClick = { onAccentColor(opt.id) },
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+                                    border = BorderStroke(if (selected) 2.dp else 1.dp, if (selected) swatch else MaterialTheme.colorScheme.outline),
+                                ) {
                                     Row(
-                                        Modifier
-                                            .fillMaxWidth()
-                                            .clickable { onDraftModel(if (selected) null else entry.id) },
+                                        Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
                                         verticalAlignment = Alignment.CenterVertically,
                                     ) {
-                                        RadioButton(selected = selected, onClick = {
-                                            onDraftModel(if (selected) null else entry.id)
-                                        })
-                                        Column(Modifier.weight(1f)) {
-                                            Text(entry.name, fontSize = 13.sp)
-                                            Text(
-                                                "${entry.quantization} · ${Formatters.bytes(entry.fileSizeBytes)}",
-                                                fontSize = 11.sp,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            )
-                                        }
+                                        Box(
+                                            Modifier
+                                                .size(14.dp)
+                                                .clip(CircleShape)
+                                                .background(swatch)
+                                        )
+                                        Spacer(Modifier.width(6.dp))
+                                        Text(opt.label, fontSize = 12.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium)
                                     }
                                 }
                             }
-                            SliderRow(
-                                title = "Draft tokens per pass",
-                                description = "How many tokens the draft proposes before the main model verifies. " +
-                                    "More tokens = bigger potential win but more wasted work when the guesses are wrong.",
-                                value = state.settings.draftTokens.toFloat(),
-                                valueRange = 2f..8f,
-                                steps = 5,
-                                label = "${state.settings.draftTokens} tokens",
-                                onChange = { onDraftTokens(it.roundToInt()) },
-                            )
-                            when {
-                                state.draftChecking -> Text(
-                                    "Checking compatibility…", fontSize = 12.sp,
+                        }
+
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
+
+                        Text("Font Family", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            FONT_OPTIONS.forEach { (id, label) ->
+                                val selected = state.fontFamily == id
+                                val previewFamily = when (id) {
+                                    "sans" -> FontFamily.SansSerif
+                                    "mono" -> FontFamily.Monospace
+                                    "serif" -> FontFamily.Serif
+                                    else -> FontFamily.Default
+                                }
+                                Surface(
+                                    onClick = { onFontFamily(id) },
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+                                    border = BorderStroke(1.dp, if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline),
+                                ) {
+                                    Text(
+                                        label,
+                                        fontFamily = previewFamily,
+                                        fontSize = 12.sp,
+                                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Device
+                    SectionCard("Device Hardware") {
+                        InfoRow("Model", state.profile.model)
+                        InfoRow("RAM", String.format(Locale.US, "%.1f GB total · %.1f GB free", state.profile.totalRamGb, state.profile.availRamGb))
+                        InfoRow("Cores", "${state.profile.cores} (${state.profile.performanceCores} performance)")
+                        InfoRow("Thermals", containerThermalLabel(state))
+                        InfoRow("GPU (Vulkan)", if (state.gpuAvailable) "Available" else "Not compiled")
+                        Spacer(Modifier.height(4.dp))
+                        OutlinedButton(onClick = onApplyDefaults, shape = RoundedCornerShape(10.dp)) {
+                            Text("Reset to device defaults")
+                        }
+                    }
+
+                    // Routing, Modes & Token Limits (up to 200,000!)
+                    SectionCard("Inference & Token Limits") {
+                        SwitchRow(
+                            title = "Cloud fallback",
+                            description = "Keyless cloud models (DeepSeek, Qwen3-VL, GPT-OSS) active when no local GGUF is loaded.",
+                            checked = state.settings.cloudFallbackEnabled,
+                            onChange = onCloudEnabled,
+                        )
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+                        SwitchRow(
+                            title = "Auto-switch models",
+                            description = "Automatically rotates to another free model if rate-limited.",
+                            checked = state.settings.autoSwitchModels,
+                            onChange = onAutoSwitchModels,
+                        )
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+                        SwitchRow(
+                            title = "Unrestricted mode",
+                            description = "Unlocked by default. Uses unfiltered system prompt and prioritizes uncensored local models. Persisted cleanly.",
+                            checked = state.settings.unrestrictedMode,
+                            onChange = onUnrestrictedMode,
+                        )
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+
+                        SliderRow(
+                            title = "Temperature",
+                            description = "Higher = more creative, lower = more deterministic.",
+                            value = state.settings.temperature,
+                            valueRange = 0f..1.5f,
+                            steps = 14,
+                            label = Formatters.compact(state.settings.temperature),
+                            onChange = onTemperature,
+                        )
+                        SliderRow(
+                            title = "Top-P",
+                            description = "Nucleus sampling cutoff (default 0.9).",
+                            value = state.settings.topP,
+                            valueRange = 0.1f..1f,
+                            steps = 8,
+                            label = Formatters.compact(state.settings.topP),
+                            onChange = onTopP,
+                        )
+
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+
+                        // Max Answer Length up to 200,000
+                        SliderRow(
+                            title = "Max answer length",
+                            description = "Output token cap per response (up to 200,000).",
+                            value = state.settings.maxTokens.toFloat(),
+                            valueRange = 256f..200_000f,
+                            steps = 0,
+                            label = "${state.settings.maxTokens} tokens",
+                            onChange = { onMaxTokens(((it / 256f).roundToInt() * 256).coerceIn(256, 200_000)) },
+                        )
+                        TokenPresetRow(
+                            presets = listOf(1024 to "1K", 4096 to "4K", 8000 to "8K", 32000 to "32K", 128000 to "128K", 200000 to "200K"),
+                            current = state.settings.maxTokens,
+                            onSelect = onMaxTokens,
+                        )
+                        if (state.settings.maxTokens > 8_000) {
+                            TokenWarningBanner("Max answer length is ${state.settings.maxTokens} (> 8,000 tokens). Some free cloud providers enforce lower output caps or may take longer to finish.")
+                        }
+
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+
+                        // Context Length up to 200,000
+                        SliderRow(
+                            title = "Context length",
+                            description = "Total prompt + answer window (up to 200,000 tokens). Estimated local KV: ${Formatters.bytes(state.kvEstimateBytes)}.",
+                            value = state.settings.contextLength.toFloat(),
+                            valueRange = 512f..200_000f,
+                            steps = 0,
+                            label = "${state.settings.contextLength} tok",
+                            onChange = { onContextLength(((it / 512f).roundToInt() * 512).coerceIn(512, 200_000)) },
+                        )
+                        TokenPresetRow(
+                            presets = listOf(2048 to "2K", 4096 to "4K", 8000 to "8K", 32000 to "32K", 128000 to "128K", 200000 to "200K"),
+                            current = state.settings.contextLength,
+                            onSelect = onContextLength,
+                        )
+                        if (state.settings.contextLength > 8_000) {
+                            TokenWarningBanner("Context length is ${state.settings.contextLength} (> 8,000 tokens). Recommended for long cloud models (DeepSeek V4.1 1M / Gemini); high values on local GGUF can trigger Android OOM kills.")
+                        }
+
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text("System prompt", fontWeight = FontWeight.Medium)
+                                Text(
+                                    state.settings.systemPrompt.take(90) + if (state.settings.systemPrompt.length > 90) "…" else "",
+                                    style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
-                                state.draftVerdict != null -> Card(
-                                    colors = CardDefaults.cardColors(
-                                        containerColor = OmniPalette.warn.copy(alpha = 0.16f),
-                                    ),
-                                    modifier = Modifier.fillMaxWidth(),
-                                ) {
-                                    Column(Modifier.padding(10.dp)) {
-                                        Text("This pair will not work", fontWeight = FontWeight.SemiBold, color = OmniPalette.warn)
-                                        Text(state.draftVerdict, fontSize = 12.sp)
-                                        Text(
-                                            "The model still loads — it just runs without the draft.",
-                                            fontSize = 11.sp,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        )
+                            }
+                            TextButton(onClick = { promptDraft = state.settings.systemPrompt; promptEditing = true }) {
+                                Text("Edit")
+                            }
+                        }
+                    }
+
+                    OutlinedButton(
+                        onClick = { advanced = !advanced },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                    ) {
+                        Text(if (advanced) "Hide Engine Danger Zone" else "Engine Tuning (Danger Zone)")
+                        Icon(if (advanced) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore, contentDescription = null)
+                    }
+
+                    AnimatedVisibility(visible = advanced) {
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            SectionCard("Memory & KV Cache") {
+                                SwitchRow(
+                                    title = "Memory-map the model (mmap)",
+                                    description = "Zero-copy file-backed weights. Keeps OOM killer away.",
+                                    checked = state.settings.useMmap,
+                                    onChange = onMmap,
+                                )
+                                SwitchRow(
+                                    title = "Lock model in RAM (mlock)",
+                                    description = "Pins weights in RAM. Disable on 4–6 GB devices.",
+                                    checked = state.settings.useMlock,
+                                    onChange = onMlock,
+                                )
+                                SwitchRow(
+                                    title = "Quantised KV cache (Q8)",
+                                    description = "Halves KV cache RAM when Flash Attention is active.",
+                                    checked = state.settings.q8KvCache,
+                                    onChange = onQ8Kv,
+                                )
+                            }
+
+                            SectionCard("Speculative Decoding") {
+                                SwitchRow(
+                                    title = "Use a draft model",
+                                    description = "Small draft model proposes tokens for faster verification.",
+                                    checked = state.settings.speculativeEnabled,
+                                    onChange = onSpeculativeEnabled,
+                                )
+                                if (state.settings.speculativeEnabled) {
+                                    val chosen = state.settings.draftModelId
+                                    if (state.draftCandidates.isEmpty()) {
+                                        Text("Download a smaller GGUF in Vault first.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    } else {
+                                        state.draftCandidates.forEach { entry ->
+                                            val selected = entry.id == chosen
+                                            Row(
+                                                Modifier.fillMaxWidth().clickable { onDraftModel(if (selected) null else entry.id) },
+                                                verticalAlignment = Alignment.CenterVertically,
+                                            ) {
+                                                RadioButton(selected = selected, onClick = { onDraftModel(if (selected) null else entry.id) })
+                                                Column(Modifier.weight(1f)) {
+                                                    Text(entry.name, fontSize = 13.sp)
+                                                    Text("${entry.quantization} · ${Formatters.bytes(entry.fileSizeBytes)}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                }
+                                            }
+                                        }
+                                    }
+                                    SliderRow(
+                                        title = "Draft tokens per pass",
+                                        description = "Candidates proposed per verification pass.",
+                                        value = state.settings.draftTokens.toFloat(),
+                                        valueRange = 2f..8f,
+                                        steps = 5,
+                                        label = "${state.settings.draftTokens} tokens",
+                                        onChange = { onDraftTokens(it.roundToInt()) },
+                                    )
+                                }
+                            }
+
+                            SectionCard("Hardware Acceleration") {
+                                SliderRow(
+                                    title = "GPU offload layers",
+                                    description = if (!state.gpuAvailable) "Vulkan backend unavailable on this runtime; CPU mode enforced." else "Vulkan GPU layers (increase by 5 safely).",
+                                    value = state.settings.gpuLayers.toFloat(),
+                                    valueRange = 0f..(state.caps.maxGpuLayers.coerceAtLeast(1)).toFloat(),
+                                    steps = ((state.caps.maxGpuLayers.coerceAtLeast(1) / 5) - 1).coerceAtLeast(0),
+                                    label = "${state.settings.gpuLayers} / ${state.caps.maxGpuLayers}",
+                                    onChange = { raw ->
+                                        val snapped = ((raw / 5f).roundToInt() * 5).coerceIn(0, state.caps.maxGpuLayers.coerceAtLeast(0))
+                                        if (snapped > 0 && !state.gpuAvailable) confirmGpu = true else onGpuLayers(snapped)
+                                    },
+                                    enabled = state.gpuAvailable,
+                                )
+                                SwitchRow(
+                                    title = "Flash attention",
+                                    description = "Disabled automatically when GPU layers > 0.",
+                                    checked = state.settings.flashAttention,
+                                    onChange = onFlashAttention,
+                                    enabled = state.settings.gpuLayers == 0,
+                                )
+                                SliderRow(
+                                    title = "CPU Threads",
+                                    description = "Performance threads for local GGUF generation.",
+                                    value = state.settings.threads.toFloat(),
+                                    valueRange = 1f..SettingsViewModel.maxSliderThreads(state.profile).toFloat(),
+                                    steps = (SettingsViewModel.maxSliderThreads(state.profile) - 2).coerceAtLeast(0),
+                                    label = "${state.settings.threads} threads",
+                                    onChange = { onThreads(it.roundToInt()) },
+                                )
+                                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    SettingsViewModel.BATCH_STEPS.forEach { size ->
+                                        val selected = state.settings.batchSize == size
+                                        Button(
+                                            onClick = { onBatchSize(size) },
+                                            colors = ButtonDefaults.buttonColors(
+                                                containerColor = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                                                contentColor = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                                            ),
+                                            shape = RoundedCornerShape(10.dp),
+                                        ) { Text(size.toString(), fontSize = 12.sp) }
                                     }
                                 }
                             }
-                        }
-                    }
 
-                    SectionCard("Speed") {
-                        SliderRow(
-                            title = "GPU offload layers",
-                            description = if (!state.gpuAvailable)
-                                "UNAVAILABLE in this build: the native library was compiled CPU-only " +
-                                    "(-Pomni.vulkan=true is required at build time). The slider is disabled " +
-                                    "rather than pretending to work."
-                            else
-                                "Layers computed on the Vulkan GPU. 0 = CPU only (default, safest). " +
-                                    "Raise in steps of 5 and check the tok/s in Chat. If the app crashes, the " +
-                                    "next launch returns to your last stable value automatically.",
-                            value = state.settings.gpuLayers.toFloat(),
-                            valueRange = 0f..(state.caps.maxGpuLayers.coerceAtLeast(1)).toFloat(),
-                            steps = ((state.caps.maxGpuLayers.coerceAtLeast(1) / 5) - 1).coerceAtLeast(0),
-                            label = if (!state.gpuAvailable) "0 (no Vulkan backend in this build)"
-                            else "${state.settings.gpuLayers} / ${state.caps.maxGpuLayers} layers",
-                            onChange = { raw ->
-                                val snapped = ((raw / 5f).roundToInt() * 5)
-                                    .coerceIn(0, state.caps.maxGpuLayers.coerceAtLeast(0))
-                                if (snapped > 0 && !state.gpuAvailable) confirmGpu = true else onGpuLayers(snapped)
-                            },
-                            enabled = state.gpuAvailable,
-                        )
-                        SwitchRow(
-                            title = "Flash attention",
-                            description = "Faster attention with less KV memory — but llama.cpp on Android forces it " +
-                                "OFF whenever GPU layers are used. Automatic.",
-                            checked = state.settings.flashAttention,
-                            onChange = onFlashAttention,
-                            enabled = state.settings.gpuLayers == 0,
-                        )
-                        SliderRow(
-                            title = "Threads",
-                            description = "CPU threads used for generation. More is not always faster: on big.LITTLE " +
-                                "SoCs the little cores become the bottleneck and drain the battery.",
-                            value = state.settings.threads.toFloat(),
-                            valueRange = 1f..SettingsViewModel.maxSliderThreads(state.profile).toFloat(),
-                            steps = (SettingsViewModel.maxSliderThreads(state.profile) - 2).coerceAtLeast(0),
-                            label = "${state.settings.threads} threads",
-                            onChange = { onThreads(it.roundToInt()) },
-                        )
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            SettingsViewModel.BATCH_STEPS.forEach { size ->
-                                val selected = state.settings.batchSize == size
+                            SectionCard("Diagnostics & Recovery") {
+                                Text(state.backendReport, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                if (state.crashLog.isNotBlank()) {
+                                    Spacer(Modifier.height(6.dp))
+                                    Text(state.crashLog, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace)
+                                    TextButton(onClick = onClearCrashLog) { Text("Clear crash log") }
+                                }
                                 Button(
-                                    onClick = { onBatchSize(size) },
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = if (selected) OmniPalette.ok else OmniPalette.surfaceHigh,
-                                        contentColor = if (selected) OmniPalette.ink
-                                        else MaterialTheme.colorScheme.onSurface,
-                                    ),
+                                    onClick = { confirmPanic = true },
+                                    colors = ButtonDefaults.buttonColors(containerColor = OmniPalette.danger, contentColor = Color.White),
+                                    modifier = Modifier.fillMaxWidth(),
                                     shape = RoundedCornerShape(10.dp),
-                                ) { Text(size.toString(), fontSize = 12.sp) }
-                            }
-                        }
-                        Text(
-                            "Batch size: prompt tokens processed per pass. Larger = faster prefill, more RAM.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-
-                    if (state.warnings.isNotEmpty()) {
-                        SectionCard("Active limits") {
-                            state.warnings.forEach {
-                                Text("• $it", style = MaterialTheme.typography.bodyMedium, fontSize = 12.sp, color = OmniPalette.warn)
+                                ) { Text("Panic Reset (CPU Safe Defaults)") }
                             }
                         }
                     }
 
-                    SectionCard("Diagnostics") {
-                        Text(
-                            state.backendReport,
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        if (state.crashLog.isNotBlank()) {
-                            Spacer(Modifier.height(8.dp))
-                            Text("Crash signatures", fontWeight = FontWeight.Medium, fontSize = 13.sp)
-                            Text(
-                                state.crashLog,
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontSize = 11.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            TextButton(onClick = onClearCrashLog) { Text("Clear log") }
-                        }
+                    state.info?.let {
+                        Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
                     }
-
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = OmniPalette.danger.copy(alpha = 0.14f)),
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Column(Modifier.padding(16.dp)) {
-                            Text("Panic button", fontWeight = FontWeight.SemiBold, color = OmniPalette.danger)
-                            Text(
-                                "Unloads the model, clears the KV cache and resets to CPU-only safe defaults. " +
-                                    "Use this if the phone is hot, slow, or behaving strangely.",
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontSize = 12.sp,
-                            )
-                            Spacer(Modifier.height(10.dp))
-                            Button(
-                                onClick = { confirmPanic = true },
-                                colors = ButtonDefaults.buttonColors(containerColor = OmniPalette.danger),
-                            ) { Text("Unload everything & reset") }
-                        }
-                    }
+                    Spacer(Modifier.height(24.dp))
                 }
             }
-
-            SectionCard("About & Credits") {
-                Text(
-                    "OmniLLM Studio",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontSize = 15.sp,
-                    color = OmniPalette.ok,
-                )
-                Text(
-                    "Autonomous on-device & keyless cloud agent workstation for Android.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
-                InfoRow("App Creator & Designer", "chefnero2999")
-                InfoRow("Runtime Engine", "llama.cpp (compiled by open-source community)")
-                InfoRow("Cloud Models", "Public keyless inference endpoints (OVH / LLM7 / Pollinations)")
-                InfoRow("Architecture", "arm64-v8a (SIMD + Vulkan)")
-                InfoRow("License", "Apache 2.0")
-            }
-
-            state.info?.let {
-                Text(it, style = MaterialTheme.typography.bodyMedium, color = OmniPalette.ok, fontSize = 12.sp)
-            }
-            Spacer(Modifier.height(24.dp))
         }
     }
 
@@ -552,10 +596,8 @@ fun SettingsScreen(
         AlertDialog(
             onDismissRequest = { confirmPanic = false },
             title = { Text("Unload and reset?") },
-            text = { Text("The model will be unloaded and all expert settings returned to CPU-only safe defaults. Your downloaded files are kept.") },
-            confirmButton = {
-                TextButton(onClick = { confirmPanic = false; onPanic() }) { Text("Do it") }
-            },
+            text = { Text("Unloads the model and resets expert settings to CPU-safe defaults. Files on disk are kept.") },
+            confirmButton = { TextButton(onClick = { confirmPanic = false; onPanic() }) { Text("Reset") } },
             dismissButton = { TextButton(onClick = { confirmPanic = false }) { Text("Cancel") } },
         )
     }
@@ -563,14 +605,8 @@ fun SettingsScreen(
     if (confirmGpu) {
         AlertDialog(
             onDismissRequest = { confirmGpu = false },
-            title = { Text("No Vulkan backend in this build") },
-            text = {
-                Text(
-                    "This APK was compiled without the Vulkan backend, so GPU offload cannot run. " +
-                        "Rebuild with ./gradlew assembleRelease -Pomni.vulkan=true on a machine with the " +
-                        "NDK's glslc available. For now, CPU-only is the safe choice."
-                )
-            },
+            title = { Text("Vulkan backend unavailable") },
+            text = { Text("No compatible Vulkan backend detected on this device; running CPU-only.") },
             confirmButton = { TextButton(onClick = { confirmGpu = false }) { Text("OK") } },
         )
     }
@@ -580,40 +616,176 @@ fun SettingsScreen(
             onDismissRequest = { promptEditing = false },
             title = { Text("System prompt") },
             text = {
-                androidx.compose.material3.OutlinedTextField(
+                OutlinedTextField(
                     value = promptDraft,
                     onValueChange = { promptDraft = it },
                     minLines = 4,
                     modifier = Modifier.fillMaxWidth(),
                 )
             },
-            confirmButton = {
-                TextButton(onClick = { promptEditing = false; onSystemPrompt(promptDraft) }) { Text("Save") }
-            },
+            confirmButton = { TextButton(onClick = { promptEditing = false; onSystemPrompt(promptDraft) }) { Text("Save") } },
             dismissButton = { TextButton(onClick = { promptEditing = false }) { Text("Cancel") } },
         )
+    }
+}
+
+@Composable
+private fun ChangelogPane() {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        BUILD_CHANGELOGS.forEachIndexed { index, entry ->
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, if (index == 0) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f) else MaterialTheme.colorScheme.outline),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = if (index == 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                            ) {
+                                Text(
+                                    entry.version,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 11.sp,
+                                    color = if (index == 0) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                )
+                            }
+                            Spacer(Modifier.width(8.dp))
+                            Text(entry.badge, fontFamily = FontFamily.Monospace, fontSize = 10.sp, color = MaterialTheme.colorScheme.secondary, fontWeight = FontWeight.Bold)
+                        }
+                        Text(entry.date, fontFamily = FontFamily.Monospace, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Text(entry.title, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    entry.notes.forEach { note ->
+                        Row(Modifier.fillMaxWidth()) {
+                            Text("▸ ", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            Text(note, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, lineHeight = 17.sp)
+                        }
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(24.dp))
+    }
+}
+
+@Composable
+private fun CreditsPane() {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        // Creator Hero Badge
+        Card(
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.55f)),
+            shape = RoundedCornerShape(18.dp),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Column(Modifier.padding(18.dp)) {
+                Text("APP CREATOR & LEAD DESIGNER", fontFamily = FontFamily.Monospace, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, letterSpacing = 1.sp)
+                Spacer(Modifier.height(6.dp))
+                Text("chefnero2999", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "Conceived, directed, and designed OmniLLM Studio — including the Obsidian Volt V3 UI system, multimodal command dock, Forge app studio workflow, and hybrid keyless routing.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    lineHeight = 18.sp,
+                )
+            }
+        }
+
+        SectionCard("Open-Source Runtime & Infrastructure") {
+            InfoRow("Local Inference Core", "llama.cpp (open-source community)")
+            InfoRow("Cloud Inference Routing", "Public keyless open-weight endpoints")
+            InfoRow("Image Generation Fleet", "Pollinations / Flux / Sana")
+            InfoRow("Target ABI", "arm64-v8a (SIMD + Vulkan)")
+            InfoRow("App License", "Apache 2.0")
+        }
+
+        Spacer(Modifier.height(24.dp))
+    }
+}
+
+@Composable
+private fun TokenPresetRow(
+    presets: List<Pair<Int, String>>,
+    current: Int,
+    onSelect: (Int) -> Unit,
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        presets.forEach { (value, label) ->
+            val selected = current == value
+            Surface(
+                onClick = { onSelect(value) },
+                shape = RoundedCornerShape(8.dp),
+                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                border = BorderStroke(1.dp, if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline),
+            ) {
+                Text(
+                    label,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TokenWarningBanner(text: String) {
+    Surface(
+        shape = RoundedCornerShape(10.dp),
+        color = OmniPalette.copper.copy(alpha = 0.14f),
+        border = BorderStroke(1.dp, OmniPalette.copper.copy(alpha = 0.45f)),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Filled.Warning, contentDescription = null, tint = OmniPalette.copper, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(text, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface, lineHeight = 15.sp)
+        }
     }
 }
 
 private fun containerThermalLabel(state: SettingsViewModel.UiState): String {
     val status = state.profile.thermalStatus
     return when {
-        status >= 4 -> "critical ($status)"
-        status >= 3 -> "severe ($status)"
-        status >= 2 -> "moderate ($status) — threads auto-halve"
-        status >= 1 -> "light ($status)"
-        else -> "nominal"
+        status >= 4 -> "Critical ($status)"
+        status >= 3 -> "Severe ($status)"
+        status >= 2 -> "Moderate ($status) — threads halved"
+        status >= 1 -> "Light ($status)"
+        else -> "Nominal"
     }
 }
 
 @Composable
 private fun SectionCard(title: String, content: @Composable () -> Unit) {
     Card(
-        colors = CardDefaults.cardColors(containerColor = OmniPalette.surface),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        shape = RoundedCornerShape(16.dp),
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(title.uppercase(), style = MaterialTheme.typography.labelSmall, color = OmniPalette.info)
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(
+                title.uppercase(),
+                fontFamily = FontFamily.Monospace,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.secondary,
+                fontWeight = FontWeight.Bold,
+            )
             content()
         }
     }
@@ -622,8 +794,8 @@ private fun SectionCard(title: String, content: @Composable () -> Unit) {
 @Composable
 private fun InfoRow(label: String, value: String) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(value, style = MaterialTheme.typography.bodyMedium)
+        Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(value, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
     }
 }
 
@@ -636,14 +808,9 @@ private fun SwitchRow(
     enabled: Boolean = true,
 ) {
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.weight(1f)) {
-            Text(title, fontWeight = FontWeight.Medium)
-            Text(
-                description,
-                style = MaterialTheme.typography.bodyMedium,
-                fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+        Column(Modifier.weight(1f).padding(end = 8.dp)) {
+            Text(title, fontWeight = FontWeight.Medium, fontSize = 14.sp)
+            Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Switch(checked = checked, onCheckedChange = onChange, enabled = enabled)
     }
@@ -661,16 +828,11 @@ private fun SliderRow(
     enabled: Boolean = true,
 ) {
     Column {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(title, fontWeight = FontWeight.Medium)
-            Text(label, style = MaterialTheme.typography.labelSmall, color = OmniPalette.ok, fontSize = 11.sp)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Text(title, fontWeight = FontWeight.Medium, fontSize = 14.sp)
+            Text(label, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
         }
-        Text(
-            description,
-            style = MaterialTheme.typography.bodyMedium,
-            fontSize = 12.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Slider(
             value = value.coerceIn(valueRange.start, valueRange.endInclusive),
             onValueChange = onChange,

@@ -46,8 +46,10 @@ data class OmniSettings(
      * uncensored at the front of the picker. It does not, and cannot, disable a provider's
      * server-side filter.
      */
-    val unrestrictedMode: Boolean = false,
+    val unrestrictedMode: Boolean = true,
     val themeMode: String = "system", // "dark" | "light" | "system"
+    val accentColor: String = "volt", // "volt" | "cobalt" | "copper" | "emerald" | "rose"
+    val fontFamily: String = "default", // "default" | "sans" | "mono" | "serif"
 ) {
     companion object {
         const val DEFAULT_SYSTEM_PROMPT =

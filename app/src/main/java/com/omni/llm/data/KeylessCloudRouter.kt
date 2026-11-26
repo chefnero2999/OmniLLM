@@ -4,10 +4,16 @@ import android.util.Log
 import com.omni.llm.core.ChatTurn
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -61,7 +67,7 @@ class KeylessCloudRouter(private val prefs: android.content.SharedPreferences) {
         val note: String = "",
     )
 
-    /** Generates an image keylessly with automatic model fallbacks so it never fails. */
+    /** Generates an image keylessly with automatic model fallbacks via pooled OkHttp. */
     suspend fun generateImage(prompt: String, modelId: String = ImageModels.DEFAULT): ImageResult =
         withContext(Dispatchers.IO) {
             val candidates = listOf(modelId, "turbo", "flux", "sana").distinct()
@@ -69,22 +75,28 @@ class KeylessCloudRouter(private val prefs: android.content.SharedPreferences) {
             var lastError: Exception? = null
 
             for (model in candidates) {
+                coroutineContext.ensureActive()
                 val url = "https://image.pollinations.ai/prompt/$encoded" +
                     "?model=$model&width=768&height=768&nologo=true&seed=" +
                     (System.currentTimeMillis() % 100000)
                 try {
-                    val conn = java.net.URL(url).openConnection() as java.net.HttpURLConnection
-                    conn.connectTimeout = 15_000
-                    conn.readTimeout = 45_000
-                    conn.setRequestProperty("User-Agent", "OmniLLM/1.0 (Android; keyless)")
-                    val code = conn.responseCode
-                    if (code in 200..299) {
-                        val bytes = conn.inputStream.use { it.readBytes() }
-                        if (bytes.size > 1024) {
-                            return@withContext ImageResult.Success(bytes, model)
+                    val req = Request.Builder()
+                        .url(url)
+                        .get()
+                        .header("User-Agent", "OmniLLM/1.0 (Android; keyless)")
+                        .build()
+                    http.newCall(req).execute().use { resp ->
+                        if (resp.isSuccessful) {
+                            val bytes = resp.body?.bytes()
+                            if (bytes != null && bytes.size > 1024) {
+                                return@withContext ImageResult.Success(bytes, model)
+                            }
+                        } else {
+                            lastError = IOException("HTTP ${resp.code}")
                         }
                     }
                 } catch (e: Exception) {
+                    if (e is kotlinx.coroutines.CancellationException) throw e
                     lastError = e
                 }
             }
@@ -111,9 +123,15 @@ class KeylessCloudRouter(private val prefs: android.content.SharedPreferences) {
     }
 
     @Serializable
+    private data class WireMessage(
+        val role: String,
+        val content: JsonElement,
+    )
+
+    @Serializable
     private data class ChatRequest(
         val model: String,
-        val messages: List<ChatMessage>,
+        val messages: List<WireMessage>,
         val stream: Boolean = true,
         @SerialName("max_tokens") val maxTokens: Int? = null,
         val temperature: Float? = null,
@@ -126,6 +144,74 @@ class KeylessCloudRouter(private val prefs: android.content.SharedPreferences) {
          */
         val referrer: String? = null,
     )
+
+    data class WebResult(val title: String, val url: String, val snippet: String)
+
+    /** Live keyless web search using DuckDuckGo HTML + Wikipedia API fallback. */
+    suspend fun webSearch(query: String, limit: Int = 4): List<WebResult> = withContext(Dispatchers.IO) {
+        val results = mutableListOf<WebResult>()
+        val encoded = java.net.URLEncoder.encode(query.trim(), "UTF-8")
+        // 1. Try DuckDuckGo HTML Lite
+        runCatching {
+            coroutineContext.ensureActive()
+            val req = Request.Builder()
+                .url("https://html.duckduckgo.com/html/?q=$encoded")
+                .header("User-Agent", "Mozilla/5.0 (Linux; Android 14) OmniLLM/1.0")
+                .get()
+                .build()
+            http.newCall(req).execute().use { resp ->
+                if (resp.isSuccessful) {
+                    val html = resp.body?.string().orEmpty()
+                    val linkRegex = Regex("""<a[^>]*class="result__a"[^>]*href="([^"]+)"[^>]*>(.*?)</a>""", RegexOption.DOT_MATCHES_ALL)
+                    val snipRegex = Regex("""<a[^>]*class="result__snippet"[^>]*>(.*?)</a>""", RegexOption.DOT_MATCHES_ALL)
+                    val links = linkRegex.findAll(html).toList()
+                    val snips = snipRegex.findAll(html).toList()
+                    for (i in links.indices) {
+                        if (results.size >= limit) break
+                        var url = links[i].groupValues[1]
+                        if (url.contains("uddg=")) {
+                            url = java.net.URLDecoder.decode(url.substringAfter("uddg=").substringBefore("&"), "UTF-8")
+                        }
+                        val title = links[i].groupValues[2].replace(Regex("<[^>]+>"), "").trim()
+                        val snip = snips.getOrNull(i)?.groupValues?.get(1)?.replace(Regex("<[^>]+>"), "")?.trim().orEmpty()
+                        if (title.isNotBlank() && url.startsWith("http")) {
+                            results += WebResult(title, url, snip)
+                        }
+                    }
+                }
+            }
+        }
+        // 2. Wikipedia fallback if DDG returned nothing (e.g. strict network/CAPTCHAs)
+        if (results.isEmpty()) {
+            runCatching {
+                coroutineContext.ensureActive()
+                val req = Request.Builder()
+                    .url("https://en.wikipedia.org/w/api.php?action=opensearch&search=$encoded&limit=$limit&format=json")
+                    .header("User-Agent", "OmniLLM/1.0 (Android; keyless)")
+                    .get()
+                    .build()
+                http.newCall(req).execute().use { resp ->
+                    if (resp.isSuccessful) {
+                        val arr = org.json.JSONArray(resp.body?.string().orEmpty())
+                        val titles = arr.optJSONArray(1)
+                        val descs = arr.optJSONArray(2)
+                        val urls = arr.optJSONArray(3)
+                        if (titles != null && urls != null) {
+                            for (i in 0 until minOf(titles.length(), limit)) {
+                                val t = titles.optString(i)
+                                val u = urls.optString(i)
+                                val d = descs?.optString(i).orEmpty()
+                                if (t.isNotBlank() && u.startsWith("http")) {
+                                    results += WebResult(t, u, d)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        results
+    }
 
     @Serializable
     private data class Delta(
@@ -206,6 +292,8 @@ class KeylessCloudRouter(private val prefs: android.content.SharedPreferences) {
             name = "LLM7",
             chatUrl = "https://api.llm7.io/v1/chat/completions",
             models = listOf(
+                "minimax-m2.7",
+                "deepseek-v4-flash-0731-fast",
                 "gpt-oss:20b",
                 "gemma4:31b",
                 "DeepSeek-V4-Flash-0731",
@@ -225,9 +313,18 @@ class KeylessCloudRouter(private val prefs: android.content.SharedPreferences) {
             id = "ovh",
             name = "OVHcloud AI Endpoints",
             chatUrl = "https://oai.endpoints.kepler.ai.cloud.ovh.net/v1/chat/completions",
-            models = listOf("Meta-Llama-3_3-70B-Instruct"),
+            models = listOf(
+                "nemotron3-nano-30b",
+                "gemma-4-26b-a4b",
+                "qwen3.6-35b-a3b",
+                "nemotron3-omni-30b",
+                "laguna-xs-2.1",
+                "DeepSeek-V4.1-Flash-1017",
+                "qwen3-vl-30b-a3b",
+                "Meta-Llama-3_3-70B-Instruct"
+            ),
             authHeader = null,
-            note = "Anonymous tier, throttled. 70B Llama as a late fallback.",
+            note = "Anonymous tier with verified open-weight models.",
         ),
         Provider(
             id = "kilo",
@@ -317,16 +414,20 @@ class KeylessCloudRouter(private val prefs: android.content.SharedPreferences) {
         /** Reasoning stream. Default no-op: the agent deliberately ignores it to save context. */
         onReasoning: (String) -> Unit = {},
         hasWaitedForQuota: Boolean = false,
+        imageDataUrls: List<String> = emptyList(),
         onDelta: (String) -> Unit,
     ): Result = withContext(Dispatchers.IO) {
         val attempts = mutableListOf<String>()
         // Human-facing reasons, newest last: the failure message quotes these so "rate limited"
         // never gets reported as "no provider answered".
         val errors = mutableListOf<String>()
-        // Put the user's chosen model first (and only that model within its provider) so a pinned
-        // model is actually used rather than being shuffled behind the failover order.
+        // Parse providerId|modelId if supplied in that form
+        val targetProviderId: String? = preferredModel?.substringBefore('|', "")?.takeIf { it.isNotEmpty() && preferredModel.contains('|') }
+        val targetModelId: String = preferredModel?.substringAfter('|') ?: (preferredModel ?: "")
+
         val ordered = orderedProviders().sortedByDescending { p ->
-            preferredModel != null && p.models.contains(preferredModel)
+            (targetProviderId != null && p.id == targetProviderId) ||
+                (targetModelId.isNotEmpty() && p.models.contains(targetModelId))
         }
         // Free tiers are quota-limited per model, and the quota is short: pollinations allows one
         // reply every 45 s per IP. Failing on that would make any multi-turn build impossible, so
@@ -339,8 +440,11 @@ class KeylessCloudRouter(private val prefs: android.content.SharedPreferences) {
                 attempts.add("${provider.id}: cooling down")
                 continue
             }
-            val modelsToTry = if (preferredModel != null && provider.models.contains(preferredModel)) {
-                listOf(preferredModel) + provider.models.filter { it != preferredModel }
+            val modelsToTry = if (targetModelId.isNotEmpty() && provider.models.contains(targetModelId)) {
+                listOf(targetModelId) + provider.models.filter { it != targetModelId }
+            } else if (targetModelId.isNotEmpty() && targetProviderId == provider.id) {
+                // If targeted specifically to this provider, try targetModelId first even if not in static list
+                listOf(targetModelId) + provider.models
             } else {
                 provider.models
             }
@@ -356,9 +460,10 @@ class KeylessCloudRouter(private val prefs: android.content.SharedPreferences) {
                     continue
                 }
                 val attempt = runCatching {
-                    callProvider(provider, model, messages, maxTokens, temperature, onReasoning, onDelta)
+                    callProvider(provider, model, messages, maxTokens, temperature, imageDataUrls, onReasoning, onDelta)
                 }
                 val error = attempt.exceptionOrNull()
+                if (error is kotlinx.coroutines.CancellationException) throw error
                 if (error == null) {
                     prefs.edit().putString(lastGoodKey, provider.id).apply()
                     return@withContext Result.Success(provider.id, model, "")
@@ -397,6 +502,7 @@ class KeylessCloudRouter(private val prefs: android.content.SharedPreferences) {
                     onWait = onWait,
                     onReasoning = onReasoning,
                     hasWaitedForQuota = true,
+                    imageDataUrls = imageDataUrls,
                     onDelta = onDelta,
                 )
             }
@@ -419,20 +525,42 @@ class KeylessCloudRouter(private val prefs: android.content.SharedPreferences) {
     private class RateLimited(message: String, val cooldownMs: Long = COOLDOWN_MS) : IOException(message)
     private class ServerError(message: String) : IOException(message)
 
-    private fun callProvider(
+    private suspend fun callProvider(
         provider: Provider,
         model: String,
         messages: List<ChatTurn>,
         maxTokens: Int,
         temperature: Float,
+        imageDataUrls: List<String>,
         onReasoning: (String) -> Unit,
         onDelta: (String) -> Unit,
     ): String {
+        kotlin.coroutines.coroutineContext.ensureActive()
+        val lastUserIdx = messages.indexOfLast { it.role == "user" }
+        val wireMessages = messages.mapIndexed { idx, turn ->
+            val contentElem: JsonElement = if (idx == lastUserIdx && imageDataUrls.isNotEmpty()) {
+                buildJsonArray {
+                    add(buildJsonObject {
+                        put("type", "text")
+                        put("text", turn.content)
+                    })
+                    imageDataUrls.forEach { dataUrl ->
+                        add(buildJsonObject {
+                            put("type", "image_url")
+                            put("image_url", buildJsonObject { put("url", dataUrl) })
+                        })
+                    }
+                }
+            } else {
+                JsonPrimitive(turn.content)
+            }
+            WireMessage(role = turn.role, content = contentElem)
+        }
         val body = json.encodeToString(
             ChatRequest.serializer(),
             ChatRequest(
                 model = model,
-                messages = messages.map { ChatMessage(role = it.role, content = it.content) },
+                messages = wireMessages,
                 stream = true,
                 maxTokens = maxTokens,
                 temperature = temperature,
@@ -472,6 +600,7 @@ class KeylessCloudRouter(private val prefs: android.content.SharedPreferences) {
             if (contentType.contains("text/event-stream", ignoreCase = true)) {
                 val source = response.body?.source() ?: throw IOException("empty body")
                 while (!source.exhausted()) {
+                    kotlin.coroutines.coroutineContext.ensureActive()
                     val line = source.readUtf8LineStrict()
                     if (!line.startsWith("data:")) continue
                     val payload = line.removePrefix("data:").trim()

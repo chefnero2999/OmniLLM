@@ -49,6 +49,8 @@ class SettingsManager(private val context: Context) {
         val autoSwitchModels = booleanPreferencesKey("auto_switch_models")
         val unrestrictedMode = booleanPreferencesKey("unrestricted_mode")
         val themeMode = stringPreferencesKey("theme_mode")
+        val accentColor = stringPreferencesKey("accent_color")
+        val fontFamily = stringPreferencesKey("font_family")
     }
 
     val settings: Flow<OmniSettings> = context.dataStore.data.map { p ->
@@ -76,8 +78,10 @@ class SettingsManager(private val context: Context) {
             draftModelId = p[Keys.draftModelId],
             draftTokens = p[Keys.draftTokens] ?: 4,
             autoSwitchModels = p[Keys.autoSwitchModels] ?: true,
-            unrestrictedMode = p[Keys.unrestrictedMode] ?: false,
+            unrestrictedMode = p[Keys.unrestrictedMode] ?: true,
             themeMode = p[Keys.themeMode] ?: "system",
+            accentColor = p[Keys.accentColor] ?: "volt",
+            fontFamily = p[Keys.fontFamily] ?: "default",
         )
     }
 
@@ -100,7 +104,8 @@ class SettingsManager(private val context: Context) {
             p[Keys.temperature] = 0.7f
             p[Keys.topP] = 0.9f
             p[Keys.autoThreads] = true
-            p[Keys.cloudEnabled] = false
+            p[Keys.cloudEnabled] = true
+            p[Keys.unrestrictedMode] = true
             p[Keys.speculativeEnabled] = false
             p[Keys.draftTokens] = 4
             p[Keys.initialized] = true
@@ -138,7 +143,11 @@ class SettingsManager(private val context: Context) {
             val notice = next.pendingCrashNotice
             if (notice != null) p[Keys.pendingCrashNotice] = notice
             else p.remove(Keys.pendingCrashNotice)
+            p[Keys.autoSwitchModels] = next.autoSwitchModels
+            p[Keys.unrestrictedMode] = next.unrestrictedMode
             p[Keys.themeMode] = next.themeMode
+            p[Keys.accentColor] = next.accentColor
+            p[Keys.fontFamily] = next.fontFamily
         }
     }
 
@@ -196,9 +205,12 @@ class SettingsManager(private val context: Context) {
         gpuAvailable: Boolean,
     ): Enforced {
         val warnings = mutableListOf<String>()
-        var ctx = settings.contextLength.coerceIn(512, caps.maxContext)
-        if (ctx != settings.contextLength) {
-            warnings.add("Context capped at ${caps.maxContext} — this device does not have RAM headroom for more.")
+        var ctx = settings.contextLength.coerceIn(512, 200_000)
+        if (ctx > 8_000) {
+            warnings.add("Context is above 8,000 tokens (${ctx}) — high RAM consumption on local GGUF models.")
+        }
+        if (settings.maxTokens > 8_000) {
+            warnings.add("Max answer length is above 8,000 tokens (${settings.maxTokens}) — may exceed provider limits or take longer.")
         }
         var layers = settings.gpuLayers
         if (!gpuAvailable && layers > 0) {

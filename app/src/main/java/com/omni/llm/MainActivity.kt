@@ -9,8 +9,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material3.Icon
@@ -70,7 +70,11 @@ class MainActivity : ComponentActivity() {
             val settings by container.settings.settings.collectAsState(
                 initial = com.omni.llm.data.OmniSettings()
             )
-            OmniTheme(themeMode = settings.themeMode) {
+            OmniTheme(
+                themeMode = settings.themeMode,
+                accentId = settings.accentColor,
+                fontId = settings.fontFamily,
+            ) {
                 val modelsVm: ModelsViewModel = viewModel()
                 val chatVm: ChatViewModel = viewModel()
                 val settingsVm: SettingsViewModel = viewModel()
@@ -118,10 +122,10 @@ class MainActivity : ComponentActivity() {
 private data class Tab(val label: String, val icon: ImageVector)
 
 private val tabs = listOf(
-    Tab("Build", Icons.Filled.Build),
-    Tab("Chat", Icons.Filled.Chat),
-    Tab("Models", Icons.Filled.Storage),
-    Tab("Settings", Icons.Filled.Settings),
+    Tab("Workspace", Icons.AutoMirrored.Filled.Chat),
+    Tab("Forge", Icons.Filled.Build),
+    Tab("Vault", Icons.Filled.Storage),
+    Tab("Core", Icons.Filled.Settings),
 )
 
 @Composable
@@ -148,8 +152,9 @@ private fun OmniShell(
                         icon = { Icon(tab.icon, contentDescription = tab.label) },
                         label = { Text(tab.label) },
                         colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = OmniPalette.ok,
-                            selectedTextColor = OmniPalette.ok,
+                            selectedIconColor = MaterialTheme.colorScheme.primary,
+                            selectedTextColor = MaterialTheme.colorScheme.primary,
+                            indicatorColor = MaterialTheme.colorScheme.primaryContainer,
                         ),
                     )
                 }
@@ -159,7 +164,41 @@ private fun OmniShell(
         val ctx = androidx.compose.ui.platform.LocalContext.current
         Box(Modifier.fillMaxSize().padding(padding)) {
             when (selected) {
-                0 -> AgentScreen(
+                0 -> ChatScreen(
+                    state = chatState,
+                    onSend = chatVm::send,
+                    onStop = chatVm::stop,
+                    onDismissBanner = chatVm::dismissBanner,
+                    onEnableCloud = chatVm::enableCloudNow,
+                    onDismissCloudOffer = chatVm::dismissCloudOffer,
+                    onOpenPicker = chatVm::openPicker,
+                    onClosePicker = chatVm::closePicker,
+                    onFilterCategory = chatVm::filterCategory,
+                    onPickModel = chatVm::openModel,
+                    onToggleContextSource = chatVm::toggleContextSource,
+                    onOpenContextSheet = chatVm::openContextSheet,
+                    onCloseContextSheet = chatVm::closeContextSheet,
+                    onAskClear = chatVm::askClear,
+                    onDismissClear = chatVm::dismissClear,
+                    onConfirmClear = chatVm::clearThread,
+                    onRetry = chatVm::retry,
+                    onStopGeneration = chatVm::stopGeneration,
+                    onRegenerate = chatVm::regenerateLast,
+                    onOpenSearch = chatVm::openSearch,
+                    onCloseSearch = chatVm::closeSearch,
+                    onUpdateSearch = chatVm::updateSearch,
+                    onStartDuel = chatVm::startArenaDuel,
+                    onStopDuel = chatVm::stopArenaDuel,
+                    onVoteArena = chatVm::voteArena,
+                    onRunStudio = chatVm::runStudioInference,
+                    onStopStudio = chatVm::stopStudioInference,
+                    onToggleDeepWeb = chatVm::toggleDeepWeb,
+                    onToggleConcise = chatVm::toggleConciseMode,
+                    onAttachUri = chatVm::attachUri,
+                    onRemoveAttachment = chatVm::removeAttachment,
+                    onEditAndResend = chatVm::editAndResend,
+                )
+                1 -> AgentScreen(
                     state = agentState,
                     onPrompt = agentVm::setPrompt,
                     onStack = agentVm::setStack,
@@ -188,38 +227,12 @@ private fun OmniShell(
                     onDismissDelete = agentVm::dismissDelete,
                     onConfirmDelete = agentVm::confirmDelete,
                     onExport = {
-                        // Inside a composable the Activity is reached through context, not
-                        // `this@MainActivity` (where `this` is the lambda receiver).
                         ProjectExport.share(
                             ctx,
                             java.io.File(ctx.filesDir, "projects/${agentState.filesSlug}"),
                         )
                     },
                     onDeleteAll = agentVm::deleteAllProjects,
-                )
-                1 -> ChatScreen(
-                    state = chatState,
-                    onSend = chatVm::send,
-                    onStop = chatVm::stop,
-                    onDismissBanner = chatVm::dismissBanner,
-                    onEnableCloud = chatVm::enableCloudNow,
-                    onDismissCloudOffer = chatVm::dismissCloudOffer,
-                    onOpenPicker = chatVm::openPicker,
-                    onClosePicker = chatVm::closePicker,
-                    onFilterCategory = chatVm::filterCategory,
-                    onPickModel = chatVm::openModel,
-                    onToggleContextSource = chatVm::toggleContextSource,
-                    onOpenContextSheet = chatVm::openContextSheet,
-                    onCloseContextSheet = chatVm::closeContextSheet,
-                    onAskClear = chatVm::askClear,
-                    onDismissClear = chatVm::dismissClear,
-                    onConfirmClear = chatVm::clearThread,
-                    onRetry = chatVm::retry,
-                    onStopGeneration = chatVm::stopGeneration,
-                    onRegenerate = chatVm::regenerateLast,
-                    onOpenSearch = chatVm::openSearch,
-                    onCloseSearch = chatVm::closeSearch,
-                    onUpdateSearch = chatVm::updateSearch,
                 )
                 2 -> ModelsScreen(
                     state = modelsState,
@@ -254,6 +267,8 @@ private fun OmniShell(
                     onAutoSwitchModels = settingsVm::setAutoSwitchModels,
                     onUnrestrictedMode = settingsVm::setUnrestrictedMode,
                     onThemeMode = settingsVm::setThemeMode,
+                    onAccentColor = settingsVm::setAccentColor,
+                    onFontFamily = settingsVm::setFontFamily,
                     onApplyDefaults = settingsVm::applyDeviceDefaults,
                     onPanic = settingsVm::panic,
                     onClearCrashLog = settingsVm::clearCrashLog,

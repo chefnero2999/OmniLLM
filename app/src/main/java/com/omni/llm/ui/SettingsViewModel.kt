@@ -42,6 +42,8 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
         /** Keyless cloud models, verified available vs. paywalled, for the picker. */
         val cloudCatalog: List<com.omni.llm.data.KeylessCloudRouter.CatalogEntry> = emptyList(),
         val themeMode: String = "system",
+        val accentColor: String = "volt",
+        val fontFamily: String = "default",
     )
 
     private val _state = MutableStateFlow(
@@ -112,6 +114,8 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
             gpuAvailable = gpu,
             needsReload = needsReload,
             themeMode = settings.themeMode,
+            accentColor = settings.accentColor,
+            fontFamily = settings.fontFamily,
         )
         refreshDraftCandidates()
     }
@@ -201,7 +205,7 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---- setters ----------------------------------------------------------------------------
 
-    fun setContextLength(value: Int) = update { it.copy(contextLength = value.coerceIn(512, _state.value.caps.maxContext)) }
+    fun setContextLength(value: Int) = update { it.copy(contextLength = value.coerceIn(512, 200_000)) }
     fun setGpuLayers(value: Int) = update { it.copy(gpuLayers = value.coerceIn(0, _state.value.caps.maxGpuLayers)) }
     fun setThreads(value: Int) = update { it.copy(threads = value.coerceIn(1, _state.value.caps.maxThreads), autoThreads = false) }
     fun setBatchSize(value: Int) = update { it.copy(batchSize = value) }
@@ -211,7 +215,7 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     fun setQ8Kv(value: Boolean) = update { it.copy(q8KvCache = value) }
     fun setTemperature(value: Float) = update { it.copy(temperature = value) }
     fun setTopP(value: Float) = update { it.copy(topP = value) }
-    fun setMaxTokens(value: Int) = update { it.copy(maxTokens = value) }
+    fun setMaxTokens(value: Int) = update { it.copy(maxTokens = value.coerceIn(64, 200_000)) }
     fun setSystemPrompt(value: String) = update { it.copy(systemPrompt = value) }
     fun setCloudModel(providerAndModel: String?) {
         // Encoded as "providerId|modelId" so one pref can pin both.
@@ -237,6 +241,14 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setThemeMode(value: String) {
         update { it.copy(themeMode = value) }
+    }
+
+    fun setAccentColor(value: String) {
+        update { it.copy(accentColor = value) }
+    }
+
+    fun setFontFamily(value: String) {
+        update { it.copy(fontFamily = value) }
     }
 
     fun applyDeviceDefaults() {

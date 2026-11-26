@@ -309,7 +309,7 @@ object ModelCatalog {
         find(key) ?: models.first { it.key == DEFAULT_CHAT_KEY }
 
     /** The default brain for chat: capable, free, and verified working. */
-    const val DEFAULT_CHAT_KEY = "llm7|gemma4:31b"
+    const val DEFAULT_CHAT_KEY = "ovh|DeepSeek-V4.1-Flash-1017"
 
     /** The default brain for builds: best measured tool-call compliance. */
     const val DEFAULT_AGENT_KEY = "ovh|DeepSeek-V4.1-Flash-1017"
