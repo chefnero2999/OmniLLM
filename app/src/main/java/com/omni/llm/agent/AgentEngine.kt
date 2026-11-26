@@ -133,25 +133,23 @@ class AgentEngine(
             transcript += ChatMsg("user", taskMessage(prompt, stack, dir))
         }
 
-        fun persist(finished: Boolean = false) {
+        suspend fun persist(finished: Boolean = false) {
             runCatching {
-                kotlinx.coroutines.runBlocking {
-                    buildState.save(
-                        BuildStateStore.State(
-                            slug = slug,
-                            prompt = saved?.prompt ?: prompt,
-                            stackName = stack.name,
-                            turns = transcript.filter { it.role != "system" }
-                                .map { BuildStateStore.Turn(it.role, it.content) }
-                                .takeLast(60),
-                            filesWritten = ProjectSandbox.tree(dir, 200)
-                                .lines().map { it.substringBefore(" (") }.filter { it.isNotBlank() },
-                            modelKeyUsed = currentModel,
-                            switchedFrom = usedModels.distinct(),
-                            finished = finished,
-                        )
+                buildState.save(
+                    BuildStateStore.State(
+                        slug = slug,
+                        prompt = saved?.prompt ?: prompt,
+                        stackName = stack.name,
+                        turns = transcript.filter { it.role != "system" }
+                            .map { BuildStateStore.Turn(it.role, it.content) }
+                            .takeLast(60),
+                        filesWritten = ProjectSandbox.tree(dir, 200)
+                            .lines().map { it.substringBefore(" (") }.filter { it.isNotBlank() },
+                        modelKeyUsed = currentModel,
+                        switchedFrom = usedModels.distinct(),
+                        finished = finished,
                     )
-                }
+                )
             }
         }
 

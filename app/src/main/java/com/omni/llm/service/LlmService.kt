@@ -65,7 +65,6 @@ class LlmService : Service() {
         workerThread = HandlerThread("omni-llm-worker").also { it.start() }
         worker = Handler(workerThread.looper) { handleMessage(it) }
         startForegroundSafely()
-        acquireWakeLock()
         Log.i(TAG, "LlmService created pid=${android.os.Process.myPid()}")
     }
 
@@ -262,6 +261,7 @@ class LlmService : Service() {
         guard.markLoadStarted(modelId, file.name, gpuLayers, nCtx)
 
         val progressHandler = Handler(mainLooper)
+        acquireWakeLock()
         try {
             LlamaBridge.load(
                 file,
@@ -294,6 +294,8 @@ class LlmService : Service() {
             guard.appendCrashSignature("load-failed model=$modelId gpuLayers=$gpuLayers ctx=$nCtx :: $message")
             sendError(requestId, message)
             return
+        } finally {
+            if (!generating) releaseWakeLock()
         }
 
         guard.markLoadFinished()
@@ -453,7 +455,9 @@ class LlmService : Service() {
 
     private fun stopWatchdogs() {
         val pm = getSystemService(PowerManager::class.java)
-        thermalListener?.let { runCatching { pm?.removeThermalStatusListener(it) } }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            thermalListener?.let { runCatching { pm?.removeThermalStatusListener(it) } }
+        }
         thermalListener = null
     }
 

@@ -90,5 +90,5 @@ object ProjectSandbox {
         root.walkTopDown()
             .filter { it.isFile && !it.name.startsWith(".") }
             .take(limit)
-            .joinToString("\n") { f -> "${f.relativeTo(root).path} (${f.length()} B)" }
+            .joinToString("\n") { f -> "${f.relativeTo(root).path.replace('\\', '/')} (${f.length()} B)" }
 }

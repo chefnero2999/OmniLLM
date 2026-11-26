@@ -2,11 +2,14 @@ package com.omni.llm.ui
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -17,16 +20,20 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.Memory
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.Button
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -38,10 +45,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -49,24 +55,24 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.omni.llm.data.ModelDownloadManager
 import com.omni.llm.ui.theme.OmniPalette
 import com.omni.llm.util.Formatters
 
-/** Categories shown in this tab, in priority order, each with its one-line purpose. */
-private val MODEL_GROUPS = listOf(
-    Triple("everyday", "Everyday", "General chat: questions, writing, summaries"),
-    Triple("coding", "Coding", "Writing and fixing code offline"),
-    Triple("reasoning", "Reasoning", "Thinks before answering — slower, better at hard problems"),
-    Triple(
-        "uncensored",
-        "Uncensored",
-        "Refusal direction removed from the weights. Runs on the phone, so there is no server-side " +
-            "filter to argue with. Turn on Unrestricted mode in Settings to put these first.",
-    ),
+private val VAULT_CATEGORIES = listOf(
+    "all" to "All",
+    "ready" to "On Disk",
+    "everyday" to "Everyday",
+    "coding" to "Coding",
+    "reasoning" to "Reasoning",
+    "uncensored" to "Uncensored",
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -88,34 +94,122 @@ fun ModelsScreen(
     }
     var urlDialog by remember { mutableStateOf(false) }
     var urlDraft by remember { mutableStateOf("") }
+    var selectedCategory by remember { mutableStateOf("all") }
+    var searchQuery by remember { mutableStateOf("") }
+    var showSearch by remember { mutableStateOf(false) }
+
+    val filteredItems = remember(state.items, selectedCategory, searchQuery) {
+        val byCat = when (selectedCategory) {
+            "all" -> state.items
+            "ready" -> state.items.filter { it.download is ModelDownloadManager.State.Ready || it.isActive }
+            else -> state.items.filter { it.entry.category == selectedCategory }
+        }
+        val q = searchQuery.trim()
+        if (q.isEmpty()) byCat else byCat.filter {
+            it.entry.name.contains(q, true) || it.entry.description.contains(q, true)
+        }
+    }
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Models") },
-                actions = {
-                    IconButton(onClick = onRefresh) {
-                        Icon(Icons.Filled.Refresh, contentDescription = "Refresh manifest")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                ),
-            )
-        },
         containerColor = MaterialTheme.colorScheme.background,
+        topBar = {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.background)
+                    .padding(horizontal = 14.dp, vertical = 10.dp)
+            ) {
+                // Vault Telemetry Capsule
+                Surface(
+                    shape = RoundedCornerShape(18.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Row(
+                        Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        val hasActive = state.items.any { it.isActive } || state.imported.any { it.isActive }
+                        Box(
+                            Modifier
+                                .size(9.dp)
+                                .clip(CircleShape)
+                                .background(if (hasActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                        )
+                        Spacer(Modifier.width(10.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                "LOCAL MODEL VAULT",
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                            Text(
+                                state.deviceSummary,
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Text(
+                                "Free storage: ${state.freeStorage} · ${state.items.count { it.download is ModelDownloadManager.State.Ready }} installed",
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 10.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        IconButton(onClick = { showSearch = !showSearch }, modifier = Modifier.size(32.dp)) {
+                            Icon(Icons.Filled.Search, contentDescription = "Filter vault", modifier = Modifier.size(18.dp))
+                        }
+                        IconButton(onClick = onRefresh, modifier = Modifier.size(32.dp)) {
+                            Icon(Icons.Filled.Refresh, contentDescription = "Refresh manifest", modifier = Modifier.size(18.dp))
+                        }
+                    }
+                }
+
+                if (showSearch) {
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        placeholder = { Text("Search local GGUF models...") },
+                        singleLine = true,
+                        shape = RoundedCornerShape(14.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+
+                Spacer(Modifier.height(8.dp))
+
+                // Category Filter Strip
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    VAULT_CATEGORIES.forEach { (id, label) ->
+                        QuickModePill(
+                            label = label,
+                            active = selectedCategory == id,
+                            tint = if (id == "uncensored") OmniPalette.copper else MaterialTheme.colorScheme.primary,
+                            onClick = { selectedCategory = id },
+                        )
+                    }
+                }
+            }
+        },
     ) { padding ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+                .padding(horizontal = 14.dp),
+            contentPadding = PaddingValues(bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            item {
-                DeviceSummaryCard(state)
-            }
-
             state.error?.let { error ->
                 item { NoticeCard(error, isError = true, onDismiss = onDismiss) }
             }
@@ -123,55 +217,38 @@ fun ModelsScreen(
                 item { NoticeCard(message, isError = false, onDismiss = onDismiss) }
             }
 
+            // Compact Import / Custom URL Bar at Top
             item {
-                Text(
-                    "Curated set · Q4_K_M only",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-
-            // Grouped by what the model is for, in the same order the cloud picker uses. A flat
-            // list of ten GGUFs with names like "Qwen 2.5 Coder 3B" gives no clue which to pick.
-            MODEL_GROUPS.forEach { (category, label, blurb) ->
-                val group = state.items.filter { it.entry.category == category }
-                if (group.isEmpty()) return@forEach
-                item(key = "hdr-$category") {
-                    Column(Modifier.padding(top = 10.dp, bottom = 2.dp)) {
-                        Text(
-                            label.uppercase(),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = OmniPalette.info,
-                            fontWeight = FontWeight.Bold,
-                        )
-                        Text(
-                            blurb,
-                            style = MaterialTheme.typography.labelSmall,
-                            fontSize = 10.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(
+                        onClick = { picker.launch(arrayOf("*/*")) },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                    ) {
+                        Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("Import .gguf", fontSize = 12.sp)
+                    }
+                    OutlinedButton(
+                        onClick = { urlDraft = ""; urlDialog = true },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                    ) {
+                        Icon(Icons.Filled.Download, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("Fetch URL", fontSize = 12.sp)
                     }
                 }
-                items(group, key = { it.entry.id }) { item ->
-                    ModelCard(
-                        item = item,
-                        loading = state.loadingModelId == item.entry.id,
-                        loadProgress = state.loadProgress,
-                        onDownload = { onDownload(item.entry) },
-                        onLoad = { onLoad(item.entry) },
-                        onUnload = onUnload,
-                        onDelete = { onDelete(item.entry) },
-                    )
-                }
             }
 
-            if (state.imported.isNotEmpty()) {
+            if (state.imported.isNotEmpty() && (selectedCategory == "all" || selectedCategory == "ready")) {
                 item {
-                    Spacer(Modifier.height(4.dp))
                     Text(
-                        "Imported GGUFs",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        "IMPORTED GGUFS (${state.imported.size})",
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.secondary,
                     )
                 }
                 items(state.imported) { imported ->
@@ -184,36 +261,37 @@ fun ModelsScreen(
                 }
             }
 
-            item {
-                OutlinedButton(
-                    onClick = { picker.launch(arrayOf("*/*")) },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Icon(Icons.Filled.Add, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Import a .gguf from storage")
+            if (filteredItems.isEmpty()) {
+                item {
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = MaterialTheme.colorScheme.surface,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                    ) {
+                        Column(Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("No models in this filter", fontWeight = FontWeight.SemiBold)
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                "Switch to 'All' or import your own .gguf weights.",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
                 }
-                Spacer(Modifier.height(8.dp))
-                OutlinedButton(
-                    onClick = { urlDraft = ""; urlDialog = true },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Icon(Icons.Filled.Download, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Download any model by URL")
+            } else {
+                items(filteredItems, key = { it.entry.id }) { item ->
+                    CompactModelCard(
+                        item = item,
+                        loading = state.loadingModelId == item.entry.id,
+                        loadProgress = state.loadProgress,
+                        onDownload = { onDownload(item.entry) },
+                        onLoad = { onLoad(item.entry) },
+                        onUnload = onUnload,
+                        onDelete = { onDelete(item.entry) },
+                    )
                 }
-            }
-
-            item {
-                Text(
-                    "Catalog downloads are SHA-256 verified. Models you import or fetch by URL are not " +
-                        "(there is no hash for an unknown file) — llama.cpp will tell you if the file is " +
-                        "unusable. Nothing here is blocked by RAM: oversized models warn, then try.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = 12.sp,
-                )
-                Spacer(Modifier.height(24.dp))
             }
         }
     }
@@ -221,14 +299,12 @@ fun ModelsScreen(
     if (urlDialog) {
         AlertDialog(
             onDismissRequest = { urlDialog = false },
-            title = { Text("Download by URL") },
+            title = { Text("Download GGUF by URL") },
             text = {
                 Column {
                     Text(
-                        "Paste a direct https link to a .gguf file. Hugging Face, a mirror, your own " +
-                            "server — anything reachable. It is saved to the app's model folder.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontSize = 12.sp,
+                        "Paste a direct https:// link to any .gguf model file.",
+                        style = MaterialTheme.typography.bodySmall,
                     )
                     Spacer(Modifier.height(8.dp))
                     OutlinedTextField(
@@ -239,49 +315,14 @@ fun ModelsScreen(
                     )
                 }
             },
-            confirmButton = {
-                TextButton(onClick = { onDownloadUrl(urlDraft); urlDialog = false }) { Text("Download") }
-            },
-            dismissButton = {
-                TextButton(onClick = { urlDialog = false }) { Text("Cancel") }
-            },
+            confirmButton = { TextButton(onClick = { onDownloadUrl(urlDraft); urlDialog = false }) { Text("Download") } },
+            dismissButton = { TextButton(onClick = { urlDialog = false }) { Text("Cancel") } },
         )
     }
 }
 
 @Composable
-private fun DeviceSummaryCard(state: ModelsViewModel.UiState) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = OmniPalette.surface),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Column(Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Filled.Memory, contentDescription = null, tint = OmniPalette.info)
-                Spacer(Modifier.width(8.dp))
-                Text("This device", style = MaterialTheme.typography.titleMedium)
-            }
-            Spacer(Modifier.height(6.dp))
-            Text(state.deviceSummary, style = MaterialTheme.typography.bodyMedium)
-            Text(
-                "Free model storage: ${state.freeStorage}",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(6.dp))
-            Text(
-                "A model is only offered when it fits in 55% of available RAM. That single rule " +
-                    "prevents most OOM crashes.",
-                style = MaterialTheme.typography.bodyMedium,
-                fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
-
-@Composable
-private fun ModelCard(
+private fun CompactModelCard(
     item: ModelsViewModel.Item,
     loading: Boolean,
     loadProgress: Float?,
@@ -292,135 +333,121 @@ private fun ModelCard(
 ) {
     val entry = item.entry
     val ready = item.download is ModelDownloadManager.State.Ready
+    var expanded by remember { mutableStateOf(false) }
+
     Card(
-        colors = CardDefaults.cardColors(containerColor = OmniPalette.surface),
-        modifier = Modifier
-            .fillMaxWidth()
-            .then(
-                if (item.isActive) Modifier.border(1.dp, OmniPalette.ok, RoundedCornerShape(12.dp))
-                else Modifier
-            ),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(
+            width = if (item.isActive) 1.5.dp else 1.dp,
+            color = if (item.isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+        ),
+        shape = RoundedCornerShape(16.dp),
+        modifier = Modifier.fillMaxWidth(),
     ) {
-        Column(Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.padding(14.dp)) {
+            Row(
+                Modifier.fillMaxWidth().clickable { expanded = !expanded },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 if (item.isActive) {
-                    Box(
-                        Modifier
-                            .size(9.dp)
-                            .background(OmniPalette.ok, CircleShape)
-                    )
+                    Box(Modifier.size(8.dp).background(MaterialTheme.colorScheme.primary, CircleShape))
                     Spacer(Modifier.width(8.dp))
                 }
-                Text(entry.name, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                Badge(entry.quantization, OmniPalette.info)
+                Column(Modifier.weight(1f)) {
+                    Text(entry.name, style = MaterialTheme.typography.titleMedium, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            "${entry.category.uppercase()} · ${Formatters.bytes(entry.fileSizeBytes)} · ${entry.quantization}",
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 10.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                Icon(
+                    if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                    contentDescription = "Details",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp),
+                )
             }
-            Spacer(Modifier.height(4.dp))
-            Row {
-                Badge(Formatters.bytes(entry.fileSizeBytes), OmniPalette.surfaceHigh)
-                Spacer(Modifier.width(6.dp))
-                Badge("${entry.minRamMb / 1024} GB+ RAM", OmniPalette.surfaceHigh)
-                Spacer(Modifier.width(6.dp))
-                Badge(Formatters.parameters(entry.paramCount), OmniPalette.surfaceHigh)
-            }
-            Spacer(Modifier.height(8.dp))
-            Text(
-                entry.description,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
 
-            // Advisory, never a block: the model can always be downloaded and loaded.
-            if (item.gate.advisory && item.gate.reason != null && !ready) {
+            if (expanded) {
                 Spacer(Modifier.height(8.dp))
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = OmniPalette.warn.copy(alpha = 0.14f)),
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(
-                        item.gate.reason,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontSize = 12.sp,
-                        color = OmniPalette.warn,
-                        modifier = Modifier.padding(10.dp),
-                    )
+                Text(entry.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.height(6.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    VaultBadge("${entry.minRamMb / 1024} GB+ RAM", MaterialTheme.colorScheme.surfaceVariant)
+                    VaultBadge(Formatters.parameters(entry.paramCount), MaterialTheme.colorScheme.surfaceVariant)
                 }
             }
 
-            Spacer(Modifier.height(12.dp))
+            if (item.gate.advisory && item.gate.reason != null && !ready) {
+                Spacer(Modifier.height(8.dp))
+                Text("⚠ ${item.gate.reason}", fontSize = 11.sp, color = OmniPalette.copper)
+            }
+
+            Spacer(Modifier.height(10.dp))
+
             when (val download = item.download) {
                 is ModelDownloadManager.State.Downloading -> {
-                    LinearProgressIndicator(
-                        progress = { download.progress },
-                        modifier = Modifier.fillMaxWidth(),
-                        color = OmniPalette.info,
-                    )
+                    LinearProgressIndicator(progress = { download.progress }, modifier = Modifier.fillMaxWidth())
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        "${Formatters.percent(download.progress)} · ${Formatters.bytes(download.bytes)} of " +
-                            Formatters.bytes(if (download.total > 0) download.total else entry.fileSizeBytes),
-                        style = MaterialTheme.typography.labelSmall,
+                        "${Formatters.percent(download.progress)} · ${Formatters.bytes(download.bytes)} / ${Formatters.bytes(if (download.total > 0) download.total else entry.fileSizeBytes)}",
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 10.sp,
                     )
                 }
                 is ModelDownloadManager.State.Verifying -> {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                        CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp)
                         Spacer(Modifier.width(8.dp))
-                        Text("Verifying SHA-256…", style = MaterialTheme.typography.bodyMedium)
+                        Text("Verifying SHA-256…", fontSize = 12.sp)
                     }
                 }
                 is ModelDownloadManager.State.Failed -> {
-                    Text(download.reason, color = OmniPalette.danger, style = MaterialTheme.typography.bodyMedium)
-                    Spacer(Modifier.height(8.dp))
-                    Button(onClick = onDownload, enabled = !loading) { Text("Retry download") }
+                    Text(download.reason, color = OmniPalette.danger, fontSize = 11.sp)
+                    Spacer(Modifier.height(6.dp))
+                    Button(onClick = onDownload, enabled = !loading, shape = RoundedCornerShape(10.dp)) { Text("Retry") }
                 }
                 else -> {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                         when {
                             item.isActive -> {
-                                OutlinedButton(onClick = onUnload) { Text("Unload") }
-                                TextButton(onClick = onDelete) {
-                                    Icon(Icons.Filled.Delete, contentDescription = "Delete model")
+                                OutlinedButton(onClick = onUnload, shape = RoundedCornerShape(10.dp)) { Text("Unload") }
+                                IconButton(onClick = onDelete, modifier = Modifier.size(34.dp)) {
+                                    Icon(Icons.Filled.Delete, contentDescription = "Delete", tint = OmniPalette.danger, modifier = Modifier.size(18.dp))
                                 }
                             }
                             ready -> {
-                                Button(onClick = onLoad, enabled = !loading) {
+                                Button(
+                                    onClick = onLoad,
+                                    enabled = !loading,
+                                    shape = RoundedCornerShape(10.dp),
+                                ) {
                                     if (loading) {
-                                        CircularProgressIndicator(
-                                            Modifier.size(14.dp),
-                                            strokeWidth = 2.dp,
-                                            color = MaterialTheme.colorScheme.onPrimary,
-                                        )
-                                        Spacer(Modifier.width(8.dp))
+                                        CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
+                                        Spacer(Modifier.width(6.dp))
                                     }
-                                    Text(if (loading) "Loading…" else "Load")
+                                    Text(if (loading) "Loading…" else "Load Model", fontSize = 12.sp)
                                 }
-                                TextButton(onClick = onDelete) {
-                                    Icon(Icons.Filled.Delete, contentDescription = "Delete model")
+                                IconButton(onClick = onDelete, modifier = Modifier.size(34.dp)) {
+                                    Icon(Icons.Filled.Delete, contentDescription = "Delete", tint = OmniPalette.danger, modifier = Modifier.size(18.dp))
                                 }
                             }
                             else -> {
-                                Button(
-                                    onClick = onDownload,
-                                    enabled = !loading,
-                                ) {
-                                    Icon(Icons.Filled.Download, contentDescription = null)
+                                Button(onClick = onDownload, enabled = !loading, shape = RoundedCornerShape(10.dp)) {
+                                    Icon(Icons.Filled.Download, contentDescription = null, modifier = Modifier.size(15.dp))
                                     Spacer(Modifier.width(6.dp))
-                                    Text("Download")
+                                    Text("Download (${Formatters.bytes(entry.fileSizeBytes)})", fontSize = 12.sp)
                                 }
                             }
                         }
                     }
                     if (loading && loadProgress != null) {
                         Spacer(Modifier.height(8.dp))
-                        LinearProgressIndicator(
-                            progress = { loadProgress },
-                            modifier = Modifier.fillMaxWidth(),
-                            color = OmniPalette.ok,
-                        )
-                        Text(
-                            "Loading into memory: ${Formatters.percent(loadProgress)}",
-                            style = MaterialTheme.typography.labelSmall,
-                        )
+                        LinearProgressIndicator(progress = { loadProgress }, modifier = Modifier.fillMaxWidth())
                     }
                 }
             }
@@ -435,21 +462,16 @@ private fun ImportedRow(
     onLoad: () -> Unit,
     onUnload: () -> Unit,
 ) {
-    Card(colors = CardDefaults.cardColors(containerColor = OmniPalette.surface), modifier = Modifier.fillMaxWidth()) {
-        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline),
+        shape = RoundedCornerShape(14.dp),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (isActive) {
-                        Box(Modifier.size(9.dp).background(OmniPalette.ok, CircleShape))
-                        Spacer(Modifier.width(8.dp))
-                    }
-                    Text(file.name, style = MaterialTheme.typography.titleMedium, fontSize = 15.sp)
-                }
-                Text(
-                    Formatters.bytes(file.length()),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                Text(file.name, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                Text(Formatters.bytes(file.length()), fontFamily = FontFamily.Monospace, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             if (isActive) OutlinedButton(onClick = onUnload) { Text("Unload") }
             else Button(onClick = onLoad) { Text("Load") }
@@ -458,13 +480,9 @@ private fun ImportedRow(
 }
 
 @Composable
-private fun Badge(text: String, color: androidx.compose.ui.graphics.Color) {
-    Box(
-        Modifier
-            .background(color.copy(alpha = 0.18f), RoundedCornerShape(6.dp))
-            .padding(horizontal = 6.dp, vertical = 2.dp)
-    ) {
-        Text(text, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Medium)
+private fun VaultBadge(text: String, bg: Color) {
+    Surface(shape = RoundedCornerShape(6.dp), color = bg) {
+        Text(text, fontFamily = FontFamily.Monospace, fontSize = 10.sp, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
     }
 }
 
@@ -472,13 +490,12 @@ private fun Badge(text: String, color: androidx.compose.ui.graphics.Color) {
 private fun NoticeCard(text: String, isError: Boolean, onDismiss: () -> Unit) {
     Card(
         colors = CardDefaults.cardColors(
-            containerColor = if (isError) OmniPalette.danger.copy(alpha = 0.14f)
-            else OmniPalette.info.copy(alpha = 0.14f)
+            containerColor = if (isError) OmniPalette.danger.copy(alpha = 0.14f) else MaterialTheme.colorScheme.primaryContainer
         ),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(text, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+            Text(text, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
             TextButton(onClick = onDismiss) { Text("Dismiss") }
         }
     }

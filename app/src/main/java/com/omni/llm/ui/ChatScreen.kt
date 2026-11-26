@@ -1,11 +1,32 @@
 package com.omni.llm.ui
 
+import android.content.Intent
+import android.graphics.BitmapFactory
+import android.net.Uri
+import android.speech.tts.TextToSpeech
+import android.util.Base64
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -13,45 +34,54 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
+import androidx.compose.material.icons.automirrored.filled.MenuBook
+import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.DeleteSweep
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.MenuBook
-import androidx.compose.material.icons.filled.Send
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
-import android.content.Intent
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -59,20 +89,24 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.omni.llm.ui.theme.OmniPalette
 import com.omni.llm.util.Formatters
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -99,27 +133,78 @@ fun ChatScreen(
     onOpenSearch: () -> Unit = {},
     onCloseSearch: () -> Unit = {},
     onUpdateSearch: (String) -> Unit = {},
+    onStartDuel: (String) -> Unit = {},
+    onStopDuel: () -> Unit = {},
+    onVoteArena: (String) -> Unit = {},
+    onRunStudio: (String, String, Float, Float, Int) -> Unit = { _, _, _, _, _ -> },
+    onStopStudio: () -> Unit = {},
+    onToggleDeepWeb: () -> Unit = {},
+    onToggleConcise: () -> Unit = {},
+    onAttachUri: (Uri) -> Unit = {},
+    onRemoveAttachment: (String) -> Unit = {},
+    onEditAndResend: (Long, String) -> Unit = { _, _ -> },
 ) {
     var input by remember { mutableStateOf("") }
-    val context = androidx.compose.ui.platform.LocalContext.current
+    // 0 = Obsidian Volt Workspace, 1 = Arena Duel, 2 = AI Studio
+    var hubMode by remember { mutableStateOf(0) }
+    var showVoiceOverlay by remember { mutableStateOf(false) }
+    var attachMenuOpen by remember { mutableStateOf(false) }
+    var editingMsg by remember { mutableStateOf<ChatViewModel.Message?>(null) }
+
+    val context = LocalContext.current
     val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
     val onCopy: (String) -> Unit = { text ->
         clipboard.setText(androidx.compose.ui.text.AnnotatedString(text))
     }
-    val listState = rememberLazyListState()
 
+    // Real Text-to-Speech engine for Read Aloud
+    var ttsReady by remember { mutableStateOf(false) }
+    val tts = remember {
+        var instance: TextToSpeech? = null
+        instance = TextToSpeech(context) { status ->
+            if (status == TextToSpeech.SUCCESS) {
+                instance?.language = Locale.getDefault()
+                ttsReady = true
+            }
+        }
+        instance
+    }
+    DisposableEffect(Unit) {
+        onDispose {
+            runCatching {
+                tts.stop()
+                tts.shutdown()
+            }
+        }
+    }
+    val onSpeak: (String) -> Unit = { text ->
+        if (ttsReady) {
+            val clean = text.replace(Regex("```[\\s\\S]*?```"), "Code block.")
+                .replace(Regex("[*_`#]"), " ")
+                .take(3000)
+            tts.speak(clean, TextToSpeech.QUEUE_FLUSH, null, "omni-tts")
+        }
+    }
+
+    val imagePicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri -> uri?.let(onAttachUri) }
+
+    val docPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri -> uri?.let(onAttachUri) }
+
+    val listState = rememberLazyListState()
     LaunchedEffect(state.messages.size, state.messages.lastOrNull()?.content?.length) {
         if (state.messages.isNotEmpty()) {
             listState.animateScrollToItem(state.messages.lastIndex)
         }
     }
 
-    // The picker and the context sheet are full-screen overlays rather than dialogs: on a phone a
-    // 30-model list inside a dialog is cramped, and the category chips need room.
     if (state.pickerOpen) {
         ModelPickerSheet(
             title = "Pick a model",
-            subtitle = "Each model keeps its own conversation. Nothing is overwritten.",
+            subtitle = "Each model keeps its own Workspace timeline.",
             selectedKey = state.activeModel?.threadKey,
             category = state.pickerCategory,
             onCategory = onFilterCategory,
@@ -145,31 +230,64 @@ fun ChatScreen(
     if (state.confirmingClear) {
         AlertDialog(
             onDismissRequest = onDismissClear,
-            title = { Text("Delete this conversation?") },
+            title = { Text("Clear this Workspace?") },
             text = {
                 Text(
-                    "This deletes the chat for ${state.activeModel?.name ?: "this model"} only. " +
-                        "Every other model's chat is untouched. It cannot be undone."
+                    "Deletes the chat history for ${state.activeModel?.name ?: "this model"} only. " +
+                        "Other models remain untouched."
                 )
             },
             confirmButton = {
-                TextButton(onClick = onConfirmClear) {
-                    Text("Delete", color = OmniPalette.danger)
-                }
+                TextButton(onClick = onConfirmClear) { Text("Delete", color = OmniPalette.danger) }
             },
             dismissButton = { TextButton(onClick = onDismissClear) { Text("Keep") } },
         )
     }
 
+    editingMsg?.let { target ->
+        var draft by remember(target.id) { mutableStateOf(target.content) }
+        AlertDialog(
+            onDismissRequest = { editingMsg = null },
+            title = { Text("Edit & Resend") },
+            text = {
+                OutlinedTextField(
+                    value = draft,
+                    onValueChange = { draft = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    maxLines = 6,
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        editingMsg = null
+                        onEditAndResend(target.id, draft)
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary),
+                ) { Text("Resend") }
+            },
+            dismissButton = { TextButton(onClick = { editingMsg = null }) { Text("Cancel") } },
+        )
+    }
+
+    val pulseTransition = rememberInfiniteTransition(label = "VoltPulse")
+    val dotAlpha by pulseTransition.animateFloat(
+        initialValue = 0.45f,
+        targetValue = 1.0f,
+        animationSpec = infiniteRepeatable(tween(900), RepeatMode.Reverse),
+        label = "DotAlpha",
+    )
+
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            if (state.searchOpen) {
+            if (state.searchOpen && hubMode == 0) {
                 TopAppBar(
                     title = {
                         OutlinedTextField(
                             value = state.searchQuery,
                             onValueChange = onUpdateSearch,
-                            placeholder = { Text("Search messages...") },
+                            placeholder = { Text("Search Workspace timeline...") },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true,
                         )
@@ -182,279 +300,538 @@ fun ChatScreen(
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
                 )
             } else {
-                TopAppBar(
-                    title = {
-                        Column(Modifier.clickable { onOpenPicker() }) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    state.activeModel?.name ?: "Local model",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                                Spacer(Modifier.width(4.dp))
-                                Icon(
-                                    Icons.Filled.ArrowDropDown,
-                                    contentDescription = "Switch model",
-                                    tint = OmniPalette.ok,
-                                    modifier = Modifier.size(20.dp),
-                                )
-                            }
-                            Text(
-                                // This line is the promise made visible: this model, this chat.
-                                "its own chat · ${state.messages.count { it.role != "system" }} messages" +
-                                    if (state.contextSources.isNotEmpty())
-                                        " · reading ${state.contextSources.size}" else "",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = if (state.contextSources.isEmpty())
-                                    MaterialTheme.colorScheme.onSurfaceVariant else OmniPalette.info,
-                            )
-                        }
-                    },
-                    actions = {
-                        IconButton(onClick = onOpenSearch) {
-                            Icon(Icons.Filled.Search, contentDescription = "Search messages")
-                        }
-                        IconButton(onClick = {
-                            val conversationText = state.messages
-                                .filter { it.role != "system" }
-                                .joinToString("\n\n") { "${if (it.role == "user") "User" else "Assistant"}: ${it.content}" }
-                            if (conversationText.isNotBlank()) {
-                                val sendIntent = Intent().apply {
-                                    action = Intent.ACTION_SEND
-                                    putExtra(Intent.EXTRA_TEXT, conversationText)
-                                    type = "text/plain"
-                                }
-                                val shareIntent = Intent.createChooser(sendIntent, "Share Conversation")
-                                context.startActivity(shareIntent)
-                            }
-                        }) {
-                            Icon(Icons.Filled.Share, contentDescription = "Share conversation")
-                        }
-                        IconButton(onClick = onOpenContextSheet) {
-                            Icon(
-                                Icons.Filled.MenuBook,
-                                contentDescription = "Read context from other chats",
-                                tint = if (state.contextSources.isEmpty()) MaterialTheme.colorScheme.onSurfaceVariant
-                                else OmniPalette.info,
-                            )
-                        }
-                        IconButton(onClick = onAskClear) {
-                            Icon(Icons.Filled.DeleteSweep, contentDescription = "Delete this chat")
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
-                )
-            }
-        },
-        containerColor = MaterialTheme.colorScheme.background,
-        bottomBar = {
-            Column(Modifier.imePadding()) {
-                ContextMeter(state)
-                Row(
+                Column(
                     Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+                        .background(MaterialTheme.colorScheme.background)
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
                 ) {
-                    OutlinedTextField(
-                        value = input,
-                        onValueChange = { input = it },
-                        modifier = Modifier.weight(1f),
-                        placeholder = { Text("Ask anything — stays on this device") },
-                        maxLines = 5,
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Default),
-                        shape = RoundedCornerShape(20.dp),
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    if (state.busy) {
-                        FilledIconButton(onClick = onStop) {
-                            Icon(Icons.Filled.Stop, contentDescription = "Stop generating")
-                        }
-                    } else {
-                        FilledIconButton(
-                            onClick = {
-                                val text = input
-                                input = ""
-                                onSend(text)
-                            },
-                            enabled = input.isNotBlank(),
+                    // Floating Telemetry Capsule (Obsidian Volt V3 Signature)
+                    Surface(
+                        shape = RoundedCornerShape(18.dp),
+                        color = MaterialTheme.colorScheme.surface,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Row(
+                            Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Icon(Icons.Filled.Send, contentDescription = "Send")
+                            Box(
+                                modifier = Modifier
+                                    .size(9.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        (if (state.busy) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.primary).copy(
+                                            alpha = if (state.busy) dotAlpha else 1f
+                                        )
+                                    )
+                            )
+                            Spacer(Modifier.width(10.dp))
+                            Column(
+                                Modifier
+                                    .weight(1f)
+                                    .clickable { onOpenPicker() }
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        state.activeModel?.name ?: "Local Engine",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                    Icon(
+                                        Icons.Filled.ArrowDropDown,
+                                        contentDescription = "Switch model",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(18.dp),
+                                    )
+                                }
+                                val modeTag = if (state.activeModel?.providerId == "local" || state.activeModel == null) "LOCAL" else "CLOUD"
+                                val tpsTag = if (state.lastTokensPerSec > 0.0) " · ${String.format(Locale.US, "%.1f", state.lastTokensPerSec)} tok/s" else ""
+                                Text(
+                                    "$modeTag$tpsTag · ${state.messages.count { it.role != "system" }} msgs",
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 10.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            if (hubMode == 0) {
+                                IconButton(onClick = onOpenSearch, modifier = Modifier.size(32.dp)) {
+                                    Icon(Icons.Filled.Search, contentDescription = "Search", modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                IconButton(onClick = onOpenContextSheet, modifier = Modifier.size(32.dp)) {
+                                    Icon(
+                                        Icons.AutoMirrored.Filled.MenuBook,
+                                        contentDescription = "Context Bridge",
+                                        modifier = Modifier.size(18.dp),
+                                        tint = if (state.contextSources.isEmpty()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.secondary,
+                                    )
+                                }
+                                IconButton(onClick = onAskClear, modifier = Modifier.size(32.dp)) {
+                                    Icon(Icons.Filled.DeleteSweep, contentDescription = "Clear", modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.height(8.dp))
+
+                    // Hub Segmented Switcher
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        QuickModePill("Timeline", active = hubMode == 0, tint = MaterialTheme.colorScheme.primary, onClick = { hubMode = 0 })
+                        QuickModePill("⚔️ Arena Duel", active = hubMode == 1, tint = OmniPalette.copper, onClick = { hubMode = 1 })
+                        QuickModePill("🎛️ Studio", active = hubMode == 2, tint = MaterialTheme.colorScheme.secondary, onClick = { hubMode = 2 })
+                        if (hubMode == 0 && state.messages.isNotEmpty()) {
+                            QuickModePill("📤 Export", active = false, tint = MaterialTheme.colorScheme.onSurfaceVariant, onClick = {
+                                val conversationText = state.messages
+                                    .filter { it.role != "system" }
+                                    .joinToString("\n\n") { "${if (it.role == "user") "YOU" else "AI"}: ${it.content}" }
+                                if (conversationText.isNotBlank()) {
+                                    val sendIntent = Intent(Intent.ACTION_SEND).apply {
+                                        putExtra(Intent.EXTRA_TEXT, conversationText)
+                                        type = "text/plain"
+                                    }
+                                    context.startActivity(Intent.createChooser(sendIntent, "Export Workspace"))
+                                }
+                            })
+                        }
+                    }
+                }
+            }
+        },
+        bottomBar = {
+            if (hubMode == 0) {
+                Column(
+                    Modifier
+                        .background(MaterialTheme.colorScheme.background)
+                        .imePadding()
+                ) {
+                    ContextMeter(state)
+
+                    // Obsidian Volt Command Dock
+                    Surface(
+                        shape = RoundedCornerShape(22.dp),
+                        color = MaterialTheme.colorScheme.surface,
+                        border = BorderStroke(
+                            1.dp,
+                            if (state.deepWebEnabled || state.pendingAttachments.isNotEmpty())
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.45f)
+                            else MaterialTheme.colorScheme.outline
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                    ) {
+                        Column(Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
+                            // Pending Uploaded Attachments Tray
+                            if (state.pendingAttachments.isNotEmpty()) {
+                                Row(
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .horizontalScroll(rememberScrollState())
+                                        .padding(bottom = 8.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                ) {
+                                    state.pendingAttachments.forEach { att ->
+                                        AttachmentTrayChip(
+                                            attachment = att,
+                                            onRemove = { onRemoveAttachment(att.id) },
+                                        )
+                                    }
+                                }
+                            }
+
+                            // Multimodal & Mode Pills inside the Command Dock
+                            Row(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .horizontalScroll(rememberScrollState())
+                                    .padding(bottom = 6.dp),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                QuickModePill(
+                                    label = "🌐 Deep Web",
+                                    active = state.deepWebEnabled,
+                                    tint = OmniPalette.copper,
+                                    onClick = onToggleDeepWeb,
+                                )
+                                QuickModePill(
+                                    label = "📎 PDF / Code",
+                                    active = false,
+                                    tint = MaterialTheme.colorScheme.secondary,
+                                    onClick = { docPicker.launch(arrayOf("text/*", "application/pdf", "application/json", "*/*")) },
+                                )
+                                QuickModePill(
+                                    label = "📷 Vision",
+                                    active = false,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    onClick = { imagePicker.launch(arrayOf("image/*")) },
+                                )
+                                QuickModePill(
+                                    label = "⚡ Concise",
+                                    active = state.conciseMode,
+                                    tint = MaterialTheme.colorScheme.secondary,
+                                    onClick = onToggleConcise,
+                                )
+                                QuickModePill(
+                                    label = "🎙️ Voice",
+                                    active = false,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    onClick = { showVoiceOverlay = true },
+                                )
+                            }
+
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box {
+                                    Surface(
+                                        onClick = { attachMenuOpen = true },
+                                        shape = RoundedCornerShape(12.dp),
+                                        color = MaterialTheme.colorScheme.surfaceVariant,
+                                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                                        modifier = Modifier.size(38.dp),
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Icon(Icons.Filled.Add, contentDescription = "Attach", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                                        }
+                                    }
+                                    DropdownMenu(
+                                        expanded = attachMenuOpen,
+                                        onDismissRequest = { attachMenuOpen = false },
+                                    ) {
+                                        DropdownMenuItem(
+                                            text = { Text("📷 Upload Image (Vision AI)") },
+                                            onClick = {
+                                                attachMenuOpen = false
+                                                imagePicker.launch(arrayOf("image/*"))
+                                            },
+                                        )
+                                        DropdownMenuItem(
+                                            text = { Text("📄 Upload PDF / Document / Code") },
+                                            onClick = {
+                                                attachMenuOpen = false
+                                                docPicker.launch(arrayOf("text/*", "application/pdf", "application/json", "*/*"))
+                                            },
+                                        )
+                                        DropdownMenuItem(
+                                            text = { Text("🎙️ Live Voice Input") },
+                                            onClick = {
+                                                attachMenuOpen = false
+                                                showVoiceOverlay = true
+                                            },
+                                        )
+                                    }
+                                }
+
+                                OutlinedTextField(
+                                    value = input,
+                                    onValueChange = { input = it },
+                                    modifier = Modifier.weight(1f),
+                                    placeholder = {
+                                        Text(
+                                            when {
+                                                state.pendingAttachments.isNotEmpty() -> "Ask about your attached file(s)..."
+                                                state.deepWebEnabled -> "Ask anything — live web search ON..."
+                                                else -> "Command OmniLLM or attach files..."
+                                            },
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
+                                        )
+                                    },
+                                    maxLines = 5,
+                                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Default),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = Color.Transparent,
+                                        unfocusedBorderColor = Color.Transparent,
+                                        focusedContainerColor = Color.Transparent,
+                                        unfocusedContainerColor = Color.Transparent,
+                                    ),
+                                )
+
+                                Spacer(Modifier.width(4.dp))
+                                if (state.busy) {
+                                    FilledIconButton(
+                                        onClick = onStop,
+                                        colors = IconButtonDefaults.filledIconButtonColors(containerColor = OmniPalette.danger),
+                                        modifier = Modifier.size(40.dp),
+                                    ) {
+                                        Icon(Icons.Filled.Stop, contentDescription = "Stop", tint = Color.White)
+                                    }
+                                } else {
+                                    val canSend = input.isNotBlank() || state.pendingAttachments.isNotEmpty()
+                                    FilledIconButton(
+                                        onClick = {
+                                            val textToSend = input
+                                            input = ""
+                                            onSend(textToSend)
+                                        },
+                                        enabled = canSend,
+                                        colors = IconButtonDefaults.filledIconButtonColors(
+                                            containerColor = if (canSend) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                                            contentColor = if (canSend) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        ),
+                                        modifier = Modifier.size(40.dp),
+                                    ) {
+                                        Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send", modifier = Modifier.size(18.dp))
+                                    }
+                                }
+                            }
                         }
                     }
                 }
             }
         },
     ) { padding ->
-        Column(
+        Box(
             Modifier
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            state.banner?.let { banner ->
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = OmniPalette.warn.copy(alpha = 0.16f)),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 4.dp),
-                ) {
-                    Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text(banner, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-                        IconButton(onClick = onDismissBanner) { Text("✕") }
-                    }
-                }
-            }
-
-            if (state.offerCloudToggle) {
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = OmniPalette.info.copy(alpha = 0.16f)),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 4.dp),
-                ) {
-                    Column(Modifier.padding(12.dp)) {
-                        Text("Chat now with free cloud models", fontWeight = FontWeight.SemiBold)
-                        Text(
-                            "Open-weight models (GPT-OSS, DeepSeek, Gemma, Kimi) served without an " +
-                                "account or API key. Claude / Gemini Pro / GPT-5 need a paid key and " +
-                                "are not available here.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontSize = 12.sp,
-                        )
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Button(onClick = onEnableCloud) { Text("Enable") }
-                            TextButton(onClick = onDismissCloudOffer) { Text("Not now") }
+            when (hubMode) {
+                1 -> ArenaDuelScreen(
+                    state = state,
+                    onStartDuel = onStartDuel,
+                    onStopDuel = onStopDuel,
+                    onVote = onVoteArena,
+                )
+                2 -> AiStudioCanvasScreen(
+                    state = state,
+                    onRunInference = onRunStudio,
+                    onStopInference = onStopStudio,
+                )
+                else -> Column(Modifier.fillMaxSize()) {
+                    state.banner?.let { banner ->
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = OmniPalette.copper.copy(alpha = 0.16f)),
+                            border = BorderStroke(1.dp, OmniPalette.copper.copy(alpha = 0.4f)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 4.dp),
+                        ) {
+                            Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Text(banner, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+                                IconButton(onClick = onDismissBanner, modifier = Modifier.size(28.dp)) { Text("✕") }
+                            }
                         }
                     }
-                }
-            }
 
-            val displayMessages = state.filteredMessages ?: state.messages
-            if (displayMessages.isEmpty()) {
-                if (state.filteredMessages != null) {
-                    Box(
-                        Modifier
-                            .fillMaxSize()
-                            .padding(32.dp),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(
-                            "No messages matching \"${state.searchQuery}\"",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                    if (state.offerCloudToggle) {
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.16f)),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.4f)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 4.dp),
+                        ) {
+                            Column(Modifier.padding(12.dp)) {
+                                Text("Unlock Cloud Models + Vision + Deep Web", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                                Spacer(Modifier.height(4.dp))
+                                Text(
+                                    "Keyless open-weight cloud fleet (DeepSeek, Qwen3-VL, GPT-OSS, Gemma) with image & file analysis — zero account needed.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
+                                Spacer(Modifier.height(8.dp))
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Button(
+                                        onClick = onEnableCloud,
+                                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary),
+                                    ) { Text("Enable Cloud") }
+                                    TextButton(onClick = onDismissCloudOffer) { Text("Later") }
+                                }
+                            }
+                        }
                     }
-                } else {
-                    EmptyState(state, onSelectStarter = { prompt -> onSend(prompt) })
-                }
-            } else {
-                LazyColumn(
-                    state = listState,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    items(displayMessages, key = { it.id }) { message ->
-                        MessageBubble(message, onRetry, onStopGeneration, onCopy)
-                    }
-                    // One-tap redo of the whole last turn, for when the answer was fine in form
-                    // but wrong in substance.
-                    if (!state.busy && displayMessages.any { it.role == "assistant" } && state.filteredMessages == null) {
-                        item {
-                            TextButton(
-                                onClick = onRegenerate,
-                                modifier = Modifier.fillMaxWidth(),
-                            ) {
-                                Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(14.dp))
-                                Spacer(Modifier.width(6.dp))
-                                Text("Regenerate last answer", fontSize = 11.sp)
+
+                    val displayMessages = state.filteredMessages ?: state.messages
+                    if (displayMessages.isEmpty()) {
+                        if (state.filteredMessages != null) {
+                            Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
+                                Text("No matches for \"${state.searchQuery}\"", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        } else {
+                            EmptyStateV3(state) { starter -> onSend(starter) }
+                        }
+                    } else {
+                        LazyColumn(
+                            state = listState,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f),
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
+                            verticalArrangement = Arrangement.spacedBy(14.dp),
+                        ) {
+                            items(displayMessages, key = { it.id }) { message ->
+                                TimelineSpineEntry(
+                                    message = message,
+                                    onRetry = onRetry,
+                                    onStop = onStopGeneration,
+                                    onCopy = onCopy,
+                                    onSpeak = onSpeak,
+                                    onEdit = { editingMsg = message },
+                                    onOpenUrl = { url ->
+                                        runCatching {
+                                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                                        }
+                                    },
+                                )
+                            }
+                            if (!state.busy && displayMessages.any { it.role == "assistant" } && state.filteredMessages == null) {
+                                item {
+                                    TextButton(onClick = onRegenerate, modifier = Modifier.fillMaxWidth()) {
+                                        Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.secondary)
+                                        Spacer(Modifier.width(6.dp))
+                                        Text("Regenerate last turn", fontSize = 11.sp, color = MaterialTheme.colorScheme.secondary)
+                                    }
+                                }
                             }
                         }
                     }
                 }
+            }
+
+            if (showVoiceOverlay) {
+                LiveVoiceOverlay(
+                    onDismiss = { showVoiceOverlay = false },
+                    onSendQuery = { spoken ->
+                        showVoiceOverlay = false
+                        hubMode = 0
+                        onSend(spoken)
+                    }
+                )
             }
         }
     }
 }
 
 @Composable
-private fun EmptyState(
+private fun AttachmentTrayChip(
+    attachment: ChatViewModel.Attachment,
+    onRemove: () -> Unit,
+) {
+    val thumb = remember(attachment.base64DataUrl) {
+        attachment.base64DataUrl?.let { url ->
+            runCatching {
+                val b64 = url.substringAfter("base64,", "")
+                val bytes = Base64.decode(b64, Base64.DEFAULT)
+                BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+            }.getOrNull()
+        }
+    }
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        border = BorderStroke(1.dp, if (attachment.isImage) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f) else MaterialTheme.colorScheme.secondary.copy(alpha = 0.5f)),
+    ) {
+        Row(
+            Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (thumb != null) {
+                Image(
+                    bitmap = thumb,
+                    contentDescription = attachment.name,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.size(28.dp).clip(RoundedCornerShape(6.dp)),
+                )
+                Spacer(Modifier.width(6.dp))
+            } else {
+                Text(if (attachment.isImage) "🖼️" else "📄", fontSize = 14.sp)
+                Spacer(Modifier.width(6.dp))
+            }
+            Column {
+                Text(
+                    attachment.name,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    if (attachment.isImage) "Vision Ready" else "${(attachment.sizeBytes / 1024).coerceAtLeast(1)} KB",
+                    fontSize = 9.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Spacer(Modifier.width(6.dp))
+            Icon(
+                Icons.Filled.Close,
+                contentDescription = "Remove attachment",
+                modifier = Modifier.size(16.dp).clickable { onRemove() },
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun EmptyStateV3(
     state: ChatViewModel.UiState,
-    onSelectStarter: (String) -> Unit = {},
+    onSelectStarter: (String) -> Unit,
 ) {
     Column(
         Modifier
             .fillMaxSize()
-            .padding(24.dp),
+            .padding(20.dp),
         verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        // Living Ambient Aura & Logo (ChatGPT/Gemini inspired)
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = Modifier
-                .size(72.dp)
-                .background(
-                    brush = androidx.compose.ui.graphics.Brush.radialGradient(
-                        colors = listOf(OmniPalette.ok.copy(alpha = 0.35f), Color.Transparent),
-                    ),
-                    shape = RoundedCornerShape(36.dp),
-                ),
-        ) {
-            Text("✨", fontSize = 32.sp)
-        }
-        Spacer(Modifier.height(12.dp))
         Text(
-            "OmniLLM Studio",
-            style = MaterialTheme.typography.titleLarge,
+            "COMMAND DECK READY",
+            fontFamily = FontFamily.Monospace,
+            fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary,
+            letterSpacing = 1.2.sp,
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(
+            state.activeModel?.name ?: "OmniLLM Hybrid Engine",
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.ExtraBold,
             color = MaterialTheme.colorScheme.onBackground,
         )
         Spacer(Modifier.height(4.dp))
         Text(
-            "Private on-device inference & resilient keyless cloud intelligence.",
-            style = MaterialTheme.typography.bodyMedium,
+            "Attach images, PDFs, or code below · Toggle Deep Web for cited live answers · Switch to Arena or Studio anytime.",
+            style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
         )
-        Spacer(Modifier.height(24.dp))
-
-        // Dynamic Starter Prompts (Pills)
-        Text(
-            "TRY ASKING",
-            style = MaterialTheme.typography.labelSmall,
-            color = OmniPalette.ok,
-            letterSpacing = 1.sp,
-            fontWeight = FontWeight.Bold,
+        Spacer(Modifier.height(18.dp))
+        val starters = listOf(
+            "🎮 Create a self-contained Neon Brick Breaker game in HTML5" to "Interactive HTML5 Game",
+            "💻 Explain Android Compose StateFlow concurrency best practices" to "Architecture Deep Dive",
+            "🧠 Compare Local Quantized GGUF vs Cloud Reasoning models" to "Hybrid AI Analysis",
         )
-        Spacer(Modifier.height(10.dp))
-        val suggestions = listOf(
-            "🚀 Build a touch-friendly space shooter game in HTML5",
-            "🔍 Explain how neural network weights are quantized to GGUF",
-            "💡 Debug a Kotlin Coroutine StateFlow recomposition issue",
-            "✍️ Draft an executive pitch for an on-device AI app"
-        )
-        Column(
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            suggestions.forEach { prompt ->
-                Card(
-                    shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { onSelectStarter(prompt) },
+        starters.forEach { (prompt, subtitle) ->
+            Surface(
+                onClick = { onSelectStarter(prompt) },
+                shape = RoundedCornerShape(14.dp),
+                color = MaterialTheme.colorScheme.surface,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+            ) {
+                Row(
+                    Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(
-                        text = prompt,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontSize = 13.sp,
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                    Box(
+                        Modifier
+                            .size(width = 3.dp, height = 28.dp)
+                            .background(MaterialTheme.colorScheme.secondary, RoundedCornerShape(2.dp))
                     )
+                    Spacer(Modifier.width(10.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(prompt, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                        Text(subtitle, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
             }
         }
@@ -463,207 +840,314 @@ private fun EmptyState(
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun MessageBubble(
+private fun TimelineSpineEntry(
     message: ChatViewModel.Message,
     onRetry: (Long) -> Unit,
     onStop: () -> Unit,
     onCopy: (String) -> Unit,
+    onSpeak: (String) -> Unit,
+    onEdit: () -> Unit,
+    onOpenUrl: (String) -> Unit,
 ) {
     val isUser = message.role == "user"
-    val bubbleColor = when {
-        message.isError -> OmniPalette.danger.copy(alpha = 0.16f)
-        isUser -> MaterialTheme.colorScheme.primaryContainer
-        else -> OmniPalette.surface
+    val railColor = when {
+        message.isError -> OmniPalette.danger
+        isUser -> MaterialTheme.colorScheme.primary
+        else -> MaterialTheme.colorScheme.secondary
     }
+
     Row(
-        Modifier.fillMaxWidth(),
-        horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
+        Modifier
+            .fillMaxWidth()
+            .height(IntrinsicSize.Min)
+            .combinedClickable(onClick = {}, onLongClick = { onCopy(message.content) }),
     ) {
-        Card(
-            colors = CardDefaults.cardColors(containerColor = bubbleColor),
-            shape = RoundedCornerShape(
-                topStart = 16.dp,
-                topEnd = 16.dp,
-                bottomStart = if (isUser) 16.dp else 4.dp,
-                bottomEnd = if (isUser) 4.dp else 16.dp,
-            ),
-            modifier = Modifier
-                .widthIn(max = 320.dp)
-                .combinedClickable(
-                    onClick = {},
-                    onLongClick = { onCopy(message.content) },
-                ),
+        // Vertical Timeline Rail + Glowing Node
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.width(16.dp).fillMaxHeight(),
         ) {
-            Column(Modifier.padding(12.dp)) {
-                // Reasoning disclosure (Claude / Gemini thinking accordion)
-                if (message.thinking.isNotBlank()) {
-                    var thinkingExpanded by remember { mutableStateOf(false) }
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 8.dp)
-                            .clickable { thinkingExpanded = !thinkingExpanded },
+            Spacer(Modifier.height(4.dp))
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .clip(CircleShape)
+                    .background(railColor)
+            )
+            Box(
+                modifier = Modifier
+                    .width(2.dp)
+                    .weight(1f)
+                    .background(railColor.copy(alpha = 0.4f))
+            )
+        }
+
+        Spacer(Modifier.width(10.dp))
+
+        Column(Modifier.weight(1f)) {
+            // Spine Header Label + Actions
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = if (isUser) "YOU" else (message.modelName ?: "OMNILLM").uppercase(),
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = railColor,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                if (!isUser && message.tokensPerSec > 0.0) {
+                    Text(
+                        String.format(Locale.US, "%.1f tok/s", message.tokensPerSec),
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 10.sp,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                    Spacer(Modifier.width(8.dp))
+                }
+                if (isUser) {
+                    ActionIcon(Icons.Filled.Edit, "Edit & Resend", MaterialTheme.colorScheme.primary, onEdit)
+                } else if (message.streaming) {
+                    ActionIcon(Icons.Filled.Stop, "Stop", OmniPalette.danger, onStop)
+                } else {
+                    ActionIcon(Icons.AutoMirrored.Filled.VolumeUp, "Read Aloud", MaterialTheme.colorScheme.primary) { onSpeak(message.content) }
+                    ActionIcon(Icons.Filled.Refresh, "Retry", MaterialTheme.colorScheme.secondary) { onRetry(message.id) }
+                    ActionIcon(Icons.Filled.ContentCopy, "Copy", MaterialTheme.colorScheme.onSurfaceVariant) { onCopy(message.content) }
+                }
+            }
+
+            Spacer(Modifier.height(4.dp))
+
+            // Attached files / images on user turn
+            if (message.attachments.isNotEmpty()) {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
+                        .padding(bottom = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    message.attachments.forEach { att ->
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                        ) {
+                            Text(
+                                (if (att.isImage) "🖼️ " else "📄 ") + att.name,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 10.sp,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Collapsible Thought Process
+            if (message.thinking.isNotBlank()) {
+                var expanded by remember { mutableStateOf(false) }
+                Surface(
+                    onClick = { expanded = !expanded },
+                    shape = RoundedCornerShape(10.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
+                ) {
+                    Column(Modifier.padding(8.dp)) {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("🧠 Reasoning trace", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.secondary)
+                            Text(if (expanded) "Hide" else "Show", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        if (expanded) {
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                message.thinking.trim(),
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (message.content.isEmpty() && message.streaming) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.secondary)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Streaming response...", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            } else {
+                // Split markdown text & ```code``` blocks into dedicated Obsidian Code Decks
+                RichTimelineBody(
+                    content = message.content,
+                    isError = message.isError,
+                    streaming = message.streaming,
+                    onCopyCode = onCopy,
+                )
+            }
+
+            // Web Search Citations (Warm Copper pills)
+            if (message.citations.isNotEmpty()) {
+                Spacer(Modifier.height(6.dp))
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    message.citations.forEach { cite ->
+                        Surface(
+                            onClick = { onOpenUrl(cite.url) },
+                            shape = RoundedCornerShape(8.dp),
+                            color = OmniPalette.copper.copy(alpha = 0.14f),
+                            border = BorderStroke(1.dp, OmniPalette.copper.copy(alpha = 0.4f)),
+                        ) {
+                            Text(
+                                "🌐 ${cite.title.take(28)}",
+                                fontSize = 10.sp,
+                                color = OmniPalette.copper,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            )
+                        }
+                    }
+                }
+            }
+
+            message.footer?.let { footer ->
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    footer,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 10.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+private sealed interface Segment {
+    data class Prose(val text: String) : Segment
+    data class Code(val lang: String, val code: String) : Segment
+}
+
+@Composable
+private fun RichTimelineBody(
+    content: String,
+    isError: Boolean,
+    streaming: Boolean,
+    onCopyCode: (String) -> Unit,
+) {
+    val segments = remember(content) {
+        val list = mutableListOf<Segment>()
+        var idx = 0
+        while (idx < content.length) {
+            val open = content.indexOf("```", idx)
+            if (open == -1) {
+                val tail = content.substring(idx).trim()
+                if (tail.isNotEmpty()) list += Segment.Prose(tail)
+                break
+            }
+            if (open > idx) {
+                val before = content.substring(idx, open).trim()
+                if (before.isNotEmpty()) list += Segment.Prose(before)
+            }
+            val close = content.indexOf("```", open + 3)
+            if (close == -1) {
+                val rest = content.substring(open + 3)
+                val firstLine = rest.substringBefore("\n", "").trim()
+                val body = if (rest.contains("\n")) rest.substringAfter("\n") else rest
+                list += Segment.Code(firstLine.ifEmpty { "code" }, body)
+                break
+            } else {
+                val inside = content.substring(open + 3, close)
+                val firstLine = inside.substringBefore("\n", "").trim()
+                val body = if (inside.contains("\n")) inside.substringAfter("\n") else inside
+                list += Segment.Code(firstLine.ifEmpty { "code" }, body.trimEnd())
+                idx = close + 3
+            }
+        }
+        if (list.isEmpty()) list += Segment.Prose(content)
+        list
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        segments.forEach { seg ->
+            when (seg) {
+                is Segment.Prose -> FormattedText(
+                    text = seg.text,
+                    color = if (isError) OmniPalette.danger else MaterialTheme.colorScheme.onBackground,
+                )
+                is Segment.Code -> {
+                    var showArtifact by remember { mutableStateOf(false) }
+                    val isHtml = seg.lang.equals("html", true) ||
+                        seg.code.contains("<!doctype html", true) ||
+                        seg.code.contains("<html", true)
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = Color(0xFF0A0E16),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.35f)),
+                        modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Column(Modifier.padding(8.dp)) {
+                        Column {
                             Row(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.12f))
+                                    .padding(horizontal = 10.dp, vertical = 6.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.SpaceBetween,
-                                modifier = Modifier.fillMaxWidth(),
                             ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text("🧠", fontSize = 11.sp)
-                                    Spacer(Modifier.width(4.dp))
-                                    Text(
-                                        "Thought process",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = OmniPalette.info,
-                                        fontWeight = FontWeight.SemiBold,
-                                    )
-                                }
                                 Text(
-                                    if (thinkingExpanded) "Hide" else "Show",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontSize = 10.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                            if (thinkingExpanded) {
-                                Spacer(Modifier.height(4.dp))
-                                Text(
-                                    text = message.thinking.trim(),
-                                    style = MaterialTheme.typography.bodySmall,
+                                    seg.lang.uppercase(),
                                     fontFamily = FontFamily.Monospace,
-                                    fontSize = 11.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        }
-                    }
-                }
-
-                if (message.content.isEmpty() && message.streaming) {
-                    Text("…", style = MaterialTheme.typography.bodyLarge)
-                } else {
-                    FormattedText(
-                        text = message.content,
-                        color = if (isUser) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
-                    )
-                }
-
-                // Interactive Claude-style Artifact preview card if HTML/code is present
-                val hasHtmlCode = remember(message.content) {
-                    message.content.contains("```html", ignoreCase = true) ||
-                        (message.content.contains("<!doctype html>", ignoreCase = true) && message.content.contains("</html>", ignoreCase = true))
-                }
-                if (hasHtmlCode && !isUser && !message.streaming) {
-                    var showArtifactSheet by remember { mutableStateOf(false) }
-                    val extractedCode = remember(message.content) {
-                        if (message.content.contains("```html", ignoreCase = true)) {
-                            message.content.substringAfter("```html").substringBefore("```").trim()
-                        } else {
-                            message.content.substringAfter("<!doctype html>").let { "<!doctype html>$it" }.substringBefore("</html>").let { "$it</html>" }.trim()
-                        }
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = OmniPalette.ok.copy(alpha = 0.12f)),
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { showArtifactSheet = true },
-                    ) {
-                        Row(
-                            Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text("⚡", fontSize = 14.sp)
-                            Spacer(Modifier.width(6.dp))
-                            Column(Modifier.weight(1f)) {
-                                Text(
-                                    "Interactive Artifact Ready",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = OmniPalette.ok,
-                                )
-                                Text(
-                                    "Tap to run live interactive preview",
-                                    style = MaterialTheme.typography.bodySmall,
                                     fontSize = 10.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.secondary,
                                 )
+                                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    if (isHtml && !streaming) {
+                                        Row(
+                                            Modifier.clickable { showArtifact = true },
+                                            verticalAlignment = Alignment.CenterVertically,
+                                        ) {
+                                            Icon(Icons.Filled.PlayArrow, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(14.dp))
+                                            Text("RUN LIVE", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                                        }
+                                    }
+                                    Row(
+                                        Modifier.clickable { onCopyCode(seg.code) },
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Icon(Icons.Filled.ContentCopy, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(12.dp))
+                                        Spacer(Modifier.width(3.dp))
+                                        Text("Copy", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                }
                             }
-                            Text("Preview →", style = MaterialTheme.typography.labelSmall, color = OmniPalette.ok)
-                        }
-                    }
-                    if (showArtifactSheet) {
-                        ArtifactPreviewDialog(
-                            html = extractedCode,
-                            onDismiss = { showArtifactSheet = false },
-                        )
-                    }
-                }
-                if (message.streaming) {
-                    Spacer(Modifier.height(6.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        CircularProgressIndicator(Modifier.size(12.dp), strokeWidth = 2.dp)
-                        Spacer(Modifier.width(6.dp))
-                        Text("generating", style = MaterialTheme.typography.labelSmall)
-                    }
-                }
-                // ---- per-reply actions, on every assistant bubble ----
-                if (!isUser) {
-                    Spacer(Modifier.height(8.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        if (message.tokensPerSec > 0.0) {
                             Text(
-                                "%.1f tok/s".format(message.tokensPerSec),
-                                style = MaterialTheme.typography.labelSmall,
-                                fontSize = 10.sp,
-                                color = OmniPalette.ok,
-                            )
-                            Spacer(Modifier.width(8.dp))
-                        }
-                        message.modelName?.let {
-                            Text(
-                                it,
-                                style = MaterialTheme.typography.labelSmall,
-                                fontSize = 10.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
+                                seg.code,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 11.5.sp,
+                                lineHeight = 16.sp,
+                                color = Color(0xFFDBE6FF),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .horizontalScroll(rememberScrollState())
+                                    .padding(10.dp),
                             )
                         }
-                        Spacer(Modifier.weight(1f))
-                        if (message.streaming) {
-                            // Stop mid-generation, keeping the partial answer.
-                            ActionIcon(Icons.Filled.Stop, "Stop generating", OmniPalette.danger, onStop)
-                        } else {
-                            ActionIcon(Icons.Filled.Refresh, "Retry this reply", OmniPalette.info) {
-                                onRetry(message.id)
-                            }
-                            ActionIcon(Icons.Filled.ContentCopy, "Copy", MaterialTheme.colorScheme.onSurfaceVariant) {
-                                onCopy(message.content)
-                            }
-                        }
                     }
-                    if (message.stopped) {
-                        Text(
-                            "stopped",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontSize = 9.sp,
-                            color = OmniPalette.warn,
-                        )
+                    if (showArtifact) {
+                        ArtifactPreviewDialog(html = seg.code, onDismiss = { showArtifact = false })
                     }
-                }
-                message.footer?.let { footer ->
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        footer,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
                 }
             }
         }
@@ -675,8 +1159,8 @@ private fun ContextMeter(state: ChatViewModel.UiState) {
     val fraction = state.contextFraction
     val color: Color = when {
         fraction > 0.9f -> OmniPalette.danger
-        fraction > 0.7f -> OmniPalette.warn
-        else -> OmniPalette.ok
+        fraction > 0.7f -> OmniPalette.copper
+        else -> MaterialTheme.colorScheme.primary
     }
     Column(Modifier.fillMaxWidth()) {
         if (state.contextLimit > 0) {
@@ -688,27 +1172,6 @@ private fun ContextMeter(state: ChatViewModel.UiState) {
                 color = color,
             )
         }
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 2.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text(
-                buildString {
-                    append(if (state.contextLimit > 0) "${state.contextUsed} / ${state.contextLimit} tokens"
-                    else "no context yet")
-                },
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(
-                Formatters.tokensPerSecond(state.lastTokensPerSec),
-                style = MaterialTheme.typography.labelSmall,
-                color = OmniPalette.ok,
-                fontSize = 11.sp,
-            )
-        }
     }
 }
 
@@ -718,36 +1181,21 @@ private fun FormattedText(
     color: Color,
     modifier: Modifier = Modifier,
 ) {
-    val annotated = remember(text, color) {
+    val inlineCodeColor = MaterialTheme.colorScheme.primary
+    val inlineCodeBg = MaterialTheme.colorScheme.surfaceVariant
+    val annotated = remember(text, color, inlineCodeColor, inlineCodeBg) {
         buildAnnotatedString {
             var i = 0
             val len = text.length
             while (i < len) {
-                if (text.startsWith("```", i)) {
-                    val endBlock = text.indexOf("```", i + 3)
-                    if (endBlock != -1) {
-                        val content = text.substring(i + 3, endBlock).trimStart()
-                        val code = if (content.contains("\n")) content.substringAfter("\n") else content
-                        withStyle(
-                            SpanStyle(
-                                fontFamily = FontFamily.Monospace,
-                                background = Color(0x33888888),
-                                fontSize = 13.sp,
-                            )
-                        ) {
-                            append(code.trimEnd())
-                        }
-                        i = endBlock + 3
-                        continue
-                    }
-                }
                 if (text[i] == '`') {
                     val end = text.indexOf('`', i + 1)
                     if (end != -1 && !text.substring(i + 1, end).contains('\n')) {
                         withStyle(
                             SpanStyle(
                                 fontFamily = FontFamily.Monospace,
-                                background = Color(0x22888888),
+                                background = inlineCodeBg,
+                                color = inlineCodeColor,
                                 fontSize = 13.sp,
                             )
                         ) {
@@ -784,18 +1232,18 @@ private fun FormattedText(
     }
     Text(
         text = annotated,
-        style = MaterialTheme.typography.bodyLarge,
+        style = MaterialTheme.typography.bodyMedium,
+        lineHeight = 21.sp,
         color = color,
         modifier = modifier,
     )
 }
 
-/** Compact icon button for the reply action row. */
 @Composable
 private fun ActionIcon(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     label: String,
-    tint: androidx.compose.ui.graphics.Color,
+    tint: Color,
     onClick: () -> Unit,
 ) {
     IconButton(onClick = onClick, modifier = Modifier.size(26.dp)) {
@@ -812,9 +1260,10 @@ fun ArtifactPreviewDialog(
         Card(
             shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)),
             modifier = Modifier
                 .fillMaxWidth()
-                .height(520.dp),
+                .height(540.dp),
         ) {
             Column(Modifier.fillMaxSize()) {
                 Row(
@@ -825,12 +1274,13 @@ fun ArtifactPreviewDialog(
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("✨", fontSize = 16.sp)
+                        Text("⚡", fontSize = 16.sp)
                         Spacer(Modifier.width(8.dp))
                         Text(
-                            "Live Artifact Preview",
+                            "Live Artifact Runner",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
                         )
                     }
                     IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
@@ -841,13 +1291,26 @@ fun ArtifactPreviewDialog(
                     Modifier
                         .weight(1f)
                         .fillMaxWidth()
-                        .background(Color(0xFF0F172A))
+                        .background(Color(0xFF0A0E16))
                 ) {
+                    val webViewHolder = remember { mutableStateOf<android.webkit.WebView?>(null) }
+                    DisposableEffect(Unit) {
+                        onDispose {
+                            webViewHolder.value?.let { wv ->
+                                (wv.parent as? android.view.ViewGroup)?.removeView(wv)
+                                wv.destroy()
+                            }
+                            webViewHolder.value = null
+                        }
+                    }
                     androidx.compose.ui.viewinterop.AndroidView(
                         factory = { ctx ->
                             android.webkit.WebView(ctx).apply {
+                                webViewHolder.value = this
                                 settings.javaScriptEnabled = true
                                 settings.domStorageEnabled = true
+                                settings.allowFileAccess = false
+                                settings.allowContentAccess = false
                                 settings.loadWithOverviewMode = true
                                 settings.useWideViewPort = true
                                 loadDataWithBaseURL("https://local.artifact", html, "text/html", "UTF-8", null)

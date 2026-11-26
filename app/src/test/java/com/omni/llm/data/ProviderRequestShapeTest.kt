@@ -104,7 +104,7 @@ class ProviderRequestShapeTest {
     fun `every catalogued chat model maps to a real provider id`() {
         // A typo here is invisible at compile time because both sides are Strings, and it shows up
         // as "model X is unavailable" in the UI. This is the cheap guard.
-        val known = setOf("pollinations", "llm7", "ovh", "pollinations-image")
+        val known = setOf("pollinations", "llm7", "ovh", "pollinations-image", "local")
         val unknown = ModelCatalog.models.map { it.providerId }.filter { it !in known }.toSet()
         assertTrue("unknown provider ids: $unknown", unknown.isEmpty())
     }

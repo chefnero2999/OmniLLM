@@ -7,8 +7,6 @@
 <data-extraction-rules>
     <cloud-backup>
         <include domain="sharedpref" path="." />
-        <exclude domain="file" path="models" />
-        <exclude domain="external" path="." />
     </cloud-backup>
     <device-transfer>
         <exclude domain="file" path="models" />

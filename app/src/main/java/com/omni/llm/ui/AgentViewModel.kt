@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.io.File
 import java.text.SimpleDateFormat
@@ -88,6 +89,7 @@ class AgentViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         refreshProjects()
+        refreshImages()
         viewModelScope.launch {
             container.settings.settings.collect { st ->
                 if (st.unrestrictedMode != _state.value.settingsUnrestricted) {
@@ -281,16 +283,29 @@ class AgentViewModel(app: Application) : AndroidViewModel(app) {
                         .apply { mkdirs() }
                     val f = File(dir, "img-" + System.currentTimeMillis() + ".jpg")
                     runCatching { f.writeBytes(result.bytes) }
-                    _state.value = _state.value.copy(
-                        imageBusy = false,
-                        images = (listOf(GeneratedImage(f, "$prompt · ${result.modelUsed}")) + _state.value.images).take(30),
-                        imagePrompt = "",
-                    )
+                    _state.update { cur ->
+                        cur.copy(
+                            imageBusy = false,
+                            images = (listOf(GeneratedImage(f, "$prompt · ${result.modelUsed}")) + cur.images).take(30),
+                            imagePrompt = "",
+                        )
+                    }
                 }
                 is com.omni.llm.data.KeylessCloudRouter.ImageResult.Failure ->
-                    _state.value = _state.value.copy(imageBusy = false, imageError = result.message)
+                    _state.update { it.copy(imageBusy = false, imageError = result.message) }
             }
         }
+    }
+
+    private fun refreshImages() {
+        val dir = File(getApplication<Application>().filesDir, "generated")
+        if (!dir.isDirectory) return
+        val loaded = (dir.listFiles() ?: emptyArray())
+            .filter { it.isFile && (it.extension.equals("jpg", true) || it.extension.equals("png", true)) }
+            .sortedByDescending { it.lastModified() }
+            .take(30)
+            .map { GeneratedImage(it, it.nameWithoutExtension) }
+        _state.update { it.copy(images = loaded) }
     }
 
     fun dismissImageError() {
@@ -468,7 +483,7 @@ class AgentViewModel(app: Application) : AndroidViewModel(app) {
         dir.walkTopDown().count { it.isFile && !it.name.startsWith(".") }
 
     private fun append(line: Line) {
-        _state.value = _state.value.copy(log = (_state.value.log + line).takeLast(400))
+        _state.update { it.copy(log = (it.log + line).takeLast(400)) }
     }
 
     private fun label(kind: AgentEngine.Step.Kind): String = when (kind) {
