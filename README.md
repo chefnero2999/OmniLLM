@@ -43,7 +43,7 @@
 
 | Workspace | Forge | Vault (Models) | Core (Settings) |
 | :---: | :---: | :---: | :---: |
-| ![Workspace](docs/screenshots/workspace_chat.png) | ![Forge](docs/screenshots/forge_simulator.png) | ![Vault](docs/screenshots/vault_models.png) | ![Core](docs/screenshots/core_settings.png) |
+| ![Workspace](docs/screenshots/v330_workspace.png) | ![Forge](docs/screenshots/v330_forge.png) | ![Vault](docs/screenshots/v330_vault.png) | ![Core](docs/screenshots/v330_core.png) |
 
 ---
 
