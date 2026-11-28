@@ -39,15 +39,11 @@
 
 ---
 
-## 📸 App Screenshots
+## 📸 App Screenshots (Real Device — v3.3.0)
 
-| Workspace | Arena Duel | AI Studio | Forge Simulator |
+| Workspace | Forge | Vault (Models) | Core (Settings) |
 | :---: | :---: | :---: | :---: |
-| ![Workspace](docs/screenshots/workspace_chat.png) | ![Arena Duel](docs/screenshots/arena_duel.png) | ![AI Studio](docs/screenshots/ai_studio.png) | ![Forge Simulator](docs/screenshots/forge_simulator.png) |
-
-| Deep Web Research | Multi-Model Image Fleet | Live Voice |
-| :---: | :---: | :---: |
-| ![Deep Web](docs/screenshots/deep_web_research.png) | ![Image Fleet](docs/screenshots/image_fleet.png) | ![Live Voice](docs/screenshots/live_voice.png) |
+| ![Workspace](docs/screenshots/workspace_chat.png) | ![Forge](docs/screenshots/forge_simulator.png) | ![Vault](docs/screenshots/vault_models.png) | ![Core](docs/screenshots/core_settings.png) |
 
 ---
 
