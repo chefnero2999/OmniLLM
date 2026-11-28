@@ -18,8 +18,8 @@ android {
         applicationId = "com.omni.llm"
         minSdk = 28
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 33
+        versionName = "3.3.0"
 
         // Referenced by ModelsManifest.kt. Point this at a static host (GitHub Pages, Cloudflare)
         // to refresh the model list without shipping an update. The bundled asset is used when

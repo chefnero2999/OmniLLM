@@ -392,6 +392,7 @@ fun ChatScreen(
                         QuickModePill("⚔️ Arena Duel", active = hubMode == 1, tint = OmniPalette.copper, onClick = { hubMode = 1 })
                         QuickModePill("🎛️ Studio", active = hubMode == 2, tint = MaterialTheme.colorScheme.secondary, onClick = { hubMode = 2 })
                         if (hubMode == 0 && state.messages.isNotEmpty()) {
+                            QuickModePill("+ New", active = false, tint = MaterialTheme.colorScheme.primary, onClick = onAskClear)
                             QuickModePill("📤 Export", active = false, tint = MaterialTheme.colorScheme.onSurfaceVariant, onClick = {
                                 val conversationText = state.messages
                                     .filter { it.role != "system" }

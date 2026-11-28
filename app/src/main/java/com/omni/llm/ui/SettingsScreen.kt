@@ -74,6 +74,17 @@ private data class ChangelogEntry(
 
 private val BUILD_CHANGELOGS = listOf(
     ChangelogEntry(
+        version = "v3.3.0",
+        title = "Self-Healing Forge, Quick New Chat & Release Optimization",
+        date = "2026-11-28",
+        badge = "LATEST",
+        notes = listOf(
+            "Added 1-tap Self-Healing Console Auto-Fix in Forge Simulator when JS runtime errors occur.",
+            "Added Quick '+ New' Workspace thread reset pill and cleaner Compose deprecation-free builds.",
+            "Bumped app versionCode to 33 (v3.3.0) with R8-shrunk signed Release APK.",
+        ),
+    ),
+    ChangelogEntry(
         version = "v3.2",
         title = "Unified Obsidian/Frost V3, 200K Window & Core Customization",
         date = "2026-11-26",

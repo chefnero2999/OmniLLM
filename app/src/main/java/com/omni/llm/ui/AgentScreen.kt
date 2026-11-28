@@ -36,7 +36,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
@@ -299,7 +299,7 @@ fun AgentScreen(
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary),
                 shape = RoundedCornerShape(12.dp),
             ) {
-                Icon(Icons.Filled.Send, contentDescription = null, modifier = Modifier.size(18.dp))
+                Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(6.dp))
                 Text(if (state.activeSlug == null) "Build" else "Build again", fontWeight = FontWeight.Bold)
             }
@@ -339,7 +339,11 @@ fun AgentScreen(
         Box(Modifier.weight(1f).fillMaxWidth()) {
             when (pane) {
                 0 -> ActivityPane(state)
-                1 -> PreviewPane(state, onRefreshPreview)
+                1 -> PreviewPane(state, onRefreshPreview) { err ->
+                    onPrompt("Fix this runtime JS console error in the existing project files without rewriting everything: $err")
+                    onBuild()
+                    pane = 0
+                }
                 else -> ImagePane(state, onImagePrompt, onSelectImageModel, onGenerateImage, onDismissImageError)
             }
         }
@@ -468,7 +472,11 @@ private fun ActivityPane(state: AgentViewModel.UiState) {
  */
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
-private fun PreviewPane(state: AgentViewModel.UiState, onReload: () -> Unit) {
+private fun PreviewPane(
+    state: AgentViewModel.UiState,
+    onReload: () -> Unit,
+    onAutoFix: (String) -> Unit = {},
+) {
     val path = state.previewPath
     val context = LocalContext.current
     var error by remember { mutableStateOf<String?>(null) }
@@ -512,8 +520,21 @@ private fun PreviewPane(state: AgentViewModel.UiState, onReload: () -> Unit) {
             .fillMaxSize()
             .padding(horizontal = 8.dp, vertical = 4.dp),
     ) {
-        error?.let {
-            Text(it, color = OmniPalette.danger, fontSize = 11.sp, modifier = Modifier.padding(4.dp))
+        error?.let { err ->
+            Row(
+                Modifier.fillMaxWidth().padding(4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(err, color = OmniPalette.danger, fontSize = 11.sp, modifier = Modifier.weight(1f), maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Spacer(Modifier.width(6.dp))
+                QuickModePill(
+                    label = "⚡ Auto-Fix",
+                    active = true,
+                    tint = OmniPalette.copper,
+                    onClick = { onAutoFix(err) },
+                )
+            }
         }
         // Sleek Device Shell Frame
         Card(
