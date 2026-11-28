@@ -155,6 +155,7 @@ fun ChatScreen(
     val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
     val onCopy: (String) -> Unit = { text ->
         clipboard.setText(androidx.compose.ui.text.AnnotatedString(text))
+        android.widget.Toast.makeText(context, "Copied to clipboard", android.widget.Toast.LENGTH_SHORT).show()
     }
 
     // Real Text-to-Speech engine for Read Aloud
@@ -911,6 +912,7 @@ private fun TimelineSpineEntry(
                     Spacer(Modifier.width(8.dp))
                 }
                 if (isUser) {
+                    ActionIcon(Icons.Filled.ContentCopy, "Copy", MaterialTheme.colorScheme.onSurfaceVariant) { onCopy(message.content) }
                     ActionIcon(Icons.Filled.Edit, "Edit & Resend", MaterialTheme.colorScheme.primary, onEdit)
                 } else if (message.streaming) {
                     ActionIcon(Icons.Filled.Stop, "Stop", OmniPalette.danger, onStop)

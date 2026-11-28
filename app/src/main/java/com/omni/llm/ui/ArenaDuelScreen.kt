@@ -19,7 +19,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -249,6 +251,17 @@ private fun DuelModelCard(
                         Spacer(Modifier.width(2.dp))
                         Text(speed, fontSize = 10.sp, color = OmniPalette.info, fontWeight = FontWeight.Bold)
                     }
+                }
+                val ctx = androidx.compose.ui.platform.LocalContext.current
+                val clip = androidx.compose.ui.platform.LocalClipboardManager.current
+                IconButton(
+                    onClick = {
+                        clip.setText(androidx.compose.ui.text.AnnotatedString(response))
+                        android.widget.Toast.makeText(ctx, "Copied to clipboard", android.widget.Toast.LENGTH_SHORT).show()
+                    },
+                    modifier = Modifier.size(28.dp),
+                ) {
+                    Icon(Icons.Filled.ContentCopy, contentDescription = "Copy response", modifier = Modifier.size(15.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
 
