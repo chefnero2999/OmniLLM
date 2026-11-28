@@ -41,9 +41,12 @@
 
 ## 📸 App Screenshots (Real Device — v3.3.0)
 
-| Workspace | Forge | Vault (Models) | Core (Settings) |
-| :---: | :---: | :---: | :---: |
-| ![Workspace](docs/screenshots/v330_workspace.png) | ![Forge](docs/screenshots/v330_forge.png) | ![Vault](docs/screenshots/v330_vault.png) | ![Core](docs/screenshots/v330_core.png) |
+<p align="center">
+  <img src="docs/screenshots/v330_workspace.png" width="210" alt="Workspace" />
+  <img src="docs/screenshots/v330_forge.png" width="210" alt="Forge" />
+  <img src="docs/screenshots/v330_vault.png" width="210" alt="Vault" />
+  <img src="docs/screenshots/v330_core.png" width="210" alt="Core" />
+</p>
 
 ---
 
