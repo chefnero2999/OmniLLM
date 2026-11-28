@@ -134,3 +134,14 @@ Output APK will be generated at:
 Distributed under the **Apache 2.0 License**. See [LICENSE](./LICENSE) for details.
 
 Developed with ❤️ by **[chefnero2999](https://github.com/chefnero2999)**.
+
+## ?? App Screenshots
+
+| Workspace | Arena Duel | AI Studio | Forge Simulator |
+| :---: | :---: | :---: | :---: |
+| ![Workspace](docs/screenshots/workspace_chat.png) | ![Arena Duel](docs/screenshots/arena_duel.png) | ![AI Studio](docs/screenshots/ai_studio.png) | ![Forge Simulator](docs/screenshots/forge_simulator.png) |
+
+| Deep Web Research | Multi-Model Image Fleet | Live Voice |
+| :---: | :---: | :---: |
+| ![Deep Web](docs/screenshots/deep_web_research.png) | ![Image Fleet](docs/screenshots/image_fleet.png) | ![Live Voice](docs/screenshots/live_voice.png) |
+
